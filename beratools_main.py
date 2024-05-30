@@ -335,11 +335,12 @@ class BeraTools(object):
             os.chdir(work_dir)
 
     def get_saved_tool_parameter(self, tool, variable):
-        data_path = Path(__file__).resolve().cwd().parent.parent.joinpath(r'.data')
+        data_path = Path(self.setting_file).parent
         if not data_path.exists():
             data_path.mkdir()
 
-        json_file = data_path.joinpath(data_path, 'saved_tool_parameters.json')
+        # json_file = data_path.joinpath(data_path, 'saved_tool_parameters.json')
+        json_file = Path(self.setting_file)
         if json_file.exists():
             with open(json_file) as open_file:
                 saved_parameters = json.load(open_file)

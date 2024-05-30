@@ -42,9 +42,27 @@ class ToolWidgets(QWidget):
         self.save_button.clicked.connect(self.save_tool_parameters)
         self.save_button.setFixedSize(200, 50)
         layout.addSpacing(20)
+
+        # TODO remove save parameters
         # layout.addWidget(self.save_button, alignment=Qt.AlignCenter)
         # layout.addStretch()
         self.setLayout(layout)
+
+    def get_widgets_arguments(self):
+        args = {}
+        param_missing = False
+        for widget in self.widget_list:
+            v = widget.get_value()
+            if v and len(v) == 2:
+                args[v[0]] = v[1]
+            else:
+                self.print_line_to_output(f'[Missing argument]: {widget.name} parameter not specified.', 'missing')
+                param_missing = True
+
+        if param_missing:
+            args = None
+
+        return args
 
     def get_current_tool_parameters(self):
         tool_params = bt.get_bera_tool_parameters(self.tool_name)
@@ -107,9 +125,6 @@ class ToolWidgets(QWidget):
             if widget:
                 if widget.optional and widget.label:
                     widget.label.setStyleSheet("QLabel { background-color : transparent; color : blue; }")
-
-                # if widget.optional and not bt.show_advanced:
-                #     widget.hide()
 
             self.widget_list.append(widget)
 
@@ -252,7 +267,7 @@ class FileSelector(QWidget):
         return filter_list
 
     def get_value(self):
-        return self.value
+        return self.flag, self.value
 
     def set_value(self, value):
         self.value = value
@@ -328,7 +343,7 @@ class OptionsInput(QWidget):
                 self.combobox.setCurrentIndex(self.option_list.index(v))
 
     def get_value(self):
-        return self.value
+        return self.flag, self.value
 
 
 class DataInput(QWidget):
@@ -370,13 +385,13 @@ class DataInput(QWidget):
         v = self.data
         if v:
             if "Integer" in self.parameter_type:
-                return self.flag, int(self.data())
+                return self.flag, int(self.data)
             elif "Float" in self.parameter_type:
-                return self.flag, float(self.data())
+                return self.flag, float(self.data)
             elif "Double" in self.parameter_type:
-                return self.flag, float(self.data())
+                return self.flag, float(self.data)
             else:  # String or StringOrNumber types
-                return self.flag, self.value.get()
+                return self.flag, self.value
         else:
             if not self.optional:
                 msg_box = QMessageBox()
