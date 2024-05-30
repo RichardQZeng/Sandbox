@@ -1,6 +1,6 @@
 import sys
 
-from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex
+from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -27,6 +27,8 @@ bt = BeraTools()
 
 
 class BTTreeView(QTreeView):
+    tool_changed = pyqtSignal(str)  # tool selection changed
+
     def __init__(self, parent=None):
         super(BTTreeView, self).__init__(parent)
 
@@ -37,7 +39,54 @@ class BTTreeView(QTreeView):
         self.setModel(self.tree_model)
         self.setUniformRowHeights(True)
 
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setFirstColumnSpanned(0, self.rootIndex(), True)
 
+        first_child = self.add_tool_list_to_tree(bt.toolbox_list, bt.sorted_tools)
+
+        self.tree_sel_model = self.selectionModel()
+        index_set = self.tree_model.index(0, 0)
+        index_child = self.tree_model.indexFromItem(first_child)
+        self.tree_sel_model.select(index_child, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        self.expand(index_set)
+        self.tree_sel_model.selectionChanged.connect(self.tree_view_selection_changed)
+
+        self.collapsed.connect(self.tree_item_collapsed)
+        self.expanded.connect(self.tree_item_expanded)
+
+    def add_tool_list_to_tree(self, toolbox_list, sorted_tools):
+        first_child = None
+        for i, toolbox in enumerate(toolbox_list):
+            parent = QStandardItem(QIcon('img/close.gif'), toolbox)
+            for j, tool in enumerate(sorted_tools[i]):
+                child = QStandardItem(QIcon('img/tool.gif'), tool)
+                if i == 0 and j == 0:
+                    first_child = child
+
+                parent.appendRow([child])
+            self.tree_model.appendRow(parent)
+
+        return first_child
+
+    def tree_view_selection_changed(self, new, old):
+        selected = new.indexes()[0]
+        item = self.tree_model.itemFromIndex(selected)
+        parent = item.parent()
+        if not parent:
+            return
+
+        toolset = parent.text()
+        tool = item.text()
+        # self.set_tool(tool)
+        self.tool_changed.emit(tool)
+
+    def tree_item_expanded(self, index):
+        item = self.tree_model.itemFromIndex(index)
+        item.setIcon(QIcon('img/open.gif'))
+
+    def tree_item_collapsed(self, index):
+        item = self.tree_model.itemFromIndex(index)
+        item.setIcon(QIcon('img/close.gif'))
 
 
 class MainWindow(QMainWindow):
@@ -48,32 +97,7 @@ class MainWindow(QMainWindow):
 
         # Tree view
         self.tree_view = BTTreeView()
-
-        parent = None
-        child = None
-        first_child = None
-        for i in range(3):
-            parent = QStandardItem(QIcon('img/close.gif'), f'Toolset description {i}')
-            for j in range(3):
-                child = QStandardItem(QIcon('img/tool.gif'), 'Tool name {}'.format(i*3+j))
-                if i == 0 and j == 0:
-                    first_child = child
-
-                parent.appendRow([child])
-            self.tree_view.tree_model.appendRow(parent)
-
-        # expand third container
-        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.tree_view.setFirstColumnSpanned(0, self.tree_view.rootIndex(), True)
-        self.tree_view.collapsed.connect(self.tree_item_collapsed)
-        self.tree_view.expanded.connect(self.tree_item_expanded)
-
-        self.tree_sel_model = self.tree_view.selectionModel()
-        index_set = self.tree_view.tree_model.index(0, 0)
-        index_child = self.tree_view.tree_model.indexFromItem(first_child)
-        self.tree_sel_model.select(index_child, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.tree_view.expand(index_set)
-        self.tree_sel_model.selectionChanged.connect(self.tree_view_selection_changed)
+        self.tree_view.tool_changed.connect(self.set_tool)
 
         # group box for tree view
         tree_box = QGroupBox()
@@ -126,18 +150,18 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(button_cancel)
 
         pagelayout = QHBoxLayout()
-        left_layout = QVBoxLayout()
-        right_layout = QVBoxLayout()
+        self.left_layout = QVBoxLayout()
+        self.right_layout = QVBoxLayout()
     
-        pagelayout.addLayout(left_layout, 3)
-        pagelayout.addLayout(right_layout, 7)
+        pagelayout.addLayout(self.left_layout, 3)
+        pagelayout.addLayout(self.right_layout, 7)
 
-        left_layout.addWidget(tree_box)
-        left_layout.addWidget(tool_search_box)
+        self.left_layout.addWidget(tree_box)
+        self.left_layout.addWidget(tool_search_box)
 
-        right_layout.addWidget(self.tool_widget)
-        right_layout.addLayout(button_layout)
-        right_layout.addWidget(text_widget)
+        self.right_layout.addWidget(self.tool_widget)
+        self.right_layout.addLayout(button_layout)
+        self.right_layout.addWidget(text_widget)
 
         widget = QWidget()
         widget.setLayout(pagelayout)
@@ -145,25 +169,10 @@ class MainWindow(QMainWindow):
 
     def set_tool(self, tool):
         self.tool_widget = ToolWidgets(tool)
-
-    def tree_view_selection_changed(self, new, old):
-        selected = new.indexes()[0]
-        item = self.tree_view.tree_model.itemFromIndex(selected)
-        parent = item.parent()
-        if not parent:
-            return
-
-        toolset = parent.text()
-        tool = item.text()
-        self.set_tool(tool)
-
-    def tree_item_expanded(self, index):
-        item = self.tree_view.tree_model.itemFromIndex(index)
-        item.setIcon(QIcon('img/open.gif'))
-
-    def tree_item_collapsed(self, index):
-        item = self.tree_view.tree_model.itemFromIndex(index)
-        item.setIcon(QIcon('img/close.gif'))
+        widget = self.right_layout.itemAt(0).widget()
+        self.right_layout.removeWidget(widget)
+        self.right_layout.insertWidget(0, self.tool_widget)
+        self.right_layout.update()
 
 
 app = QApplication(sys.argv)
