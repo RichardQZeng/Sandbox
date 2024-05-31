@@ -2,6 +2,7 @@ import threading
 import glob
 import platform
 import webbrowser
+import faulthandler
 
 from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, pyqtSignal
 from PyQt5.QtWidgets import (
@@ -14,12 +15,13 @@ from PyQt5.QtWidgets import (
     QTreeView,
     QAbstractItemView,
     QListWidgetItem,
-    QPlainTextEdit,
+    QTextEdit,
     QListWidget,
     QGroupBox,
     QLineEdit,
     QSlider,
-    QLabel
+    QLabel,
+    QProgressBar
 )
 
 from PyQt5.QtGui import *
@@ -49,11 +51,19 @@ class BTTreeView(QTreeView):
         first_child = self.add_tool_list_to_tree(bt.toolbox_list, bt.sorted_tools)
 
         self.tree_sel_model = self.selectionModel()
-        index_set = self.tree_model.index(0, 0)
-        index_child = self.tree_model.indexFromItem(first_child)
-        self.tree_sel_model.select(index_child, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.expand(index_set)
         self.tree_sel_model.selectionChanged.connect(self.tree_view_selection_changed)
+
+        index = None
+        if bt.recent_tool:
+            # select recent tool
+            index = self.select_tool(bt.recent_tool)
+        else:
+            index_set = self.tree_model.index(0, 0)
+            index = self.tree_model.indexFromItem(first_child)
+            self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+            self.expand(index_set)
+
+        self.tree_sel_model.setCurrentIndex(index, QItemSelectionModel.Current)
 
         self.collapsed.connect(self.tree_item_collapsed)
         self.expanded.connect(self.tree_item_expanded)
@@ -92,13 +102,36 @@ class BTTreeView(QTreeView):
         item = self.tree_model.itemFromIndex(index)
         item.setIcon(QIcon('img/close.gif'))
 
+    def select_tool(self, tool_name):
+        item = self.tree_model.findItems(tool_name, Qt.MatchExactly | Qt.MatchRecursive)
+        if len(item) > 0:
+            item = item[0]
+
+        index = self.tree_model.indexFromItem(item)
+        self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        self.expand(index.parent())
+
+        return index
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("My App")
-        self.current_tool_api = None
+        self.script_dir = os.path.dirname(os.path.realpath(__file__))
+        self.title = 'BERA Tools'
+        self.working_dir = bt.get_working_dir()
+        self.tool_api = None
+        self.tool_name = None
+        self.recent_tool = bt.recent_tool
+        if self.recent_tool:
+            self.tool_name = self.recent_tool
+            self.tool_api = bt.get_bera_tool_api(self.tool_name)
+
+        max_cores = bt.get_max_cpu_cores()
+        if bt.get_max_procs() <= 0:
+            bt.set_max_procs(max_cores)
 
         # BERA tool list
         if platform.system() == 'Windows':
@@ -123,15 +156,10 @@ class MainWindow(QMainWindow):
 
         bt.set_bera_dir(self.exe_path)
 
-        self.script_dir = os.path.dirname(os.path.realpath(__file__))
-        self.tool_name = 'Raster Line Attributes'
-        self.title = 'BERA Tools'
-
-        self.working_dir = bt.get_working_dir()
-
         # Tree view
         self.tree_view = BTTreeView()
         self.tree_view.tool_changed.connect(self.set_tool)
+        self.tree_view.tree_sel_model.selectionChanged.connect(self.update_tool_info)
 
         # group box for tree view
         tree_box = QGroupBox()
@@ -161,10 +189,15 @@ class MainWindow(QMainWindow):
         tool_search_box.setLayout(tool_search_layout)
 
         # ToolWidgets
-        self.tool_widget = ToolWidgets('Raster Line Attributes')
+        self.tool_widget = ToolWidgets(self.recent_tool)
 
         # Text widget
-        self.text_widget = QPlainTextEdit()
+        self.text_widget = QTextEdit()
+
+        # progress bar
+        self.progress_label = QLabel()
+        self.progress_bar = QProgressBar(self)
+        self.progress_var = 0
 
         # buttons
         label = QLabel('Use CPU Cores: ')
@@ -183,6 +216,11 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.button_run)
         button_layout.addWidget(button_cancel)
 
+        # progress layout
+        progress_layout = QHBoxLayout()
+        progress_layout.addWidget(self.progress_label)
+        progress_layout.addWidget(self.progress_bar)
+
         page_layout = QHBoxLayout()
         self.left_layout = QVBoxLayout()
         self.right_layout = QVBoxLayout()
@@ -196,16 +234,20 @@ class MainWindow(QMainWindow):
         self.right_layout.addWidget(self.tool_widget)
         self.right_layout.addLayout(button_layout)
         self.right_layout.addWidget(self.text_widget)
+        self.right_layout.addLayout(progress_layout)
 
         # signals and slots
-        self.button_run.clicked.connect(self.start_run_tool_thread)
+        # self.button_run.clicked.connect(self.start_run_tool_thread)
+        self.button_run.clicked.connect(self.run_tool)
 
-        widget = QWidget()
+        widget = QWidget(self)
         widget.setLayout(page_layout)
         self.setCentralWidget(widget)
 
     def set_tool(self, tool):
-        self.tool_widget = ToolWidgets(tool)
+        self.tool_name = tool
+        self.tool_api = bt.get_bera_tool_api(self.tool_name)
+        self.tool_widget = ToolWidgets(self.tool_name)
         widget = self.right_layout.itemAt(0).widget()
         self.right_layout.removeWidget(widget)
         self.right_layout.insertWidget(0, self.tool_widget)
@@ -224,10 +266,8 @@ class MainWindow(QMainWindow):
             self.tool_name = self.tools_list[0]
 
     def save_tool_parameter(self):
-        data_path = Path(__file__).resolve().cwd().parent.parent.joinpath(r'.data')
-        if not data_path.exists():
-            data_path.mkdir()
-        json_file = data_path.joinpath(data_path, 'saved_tool_parameters.json')
+        data_path = bt.get_data_folder()
+        json_file = Path(data_path).joinpath('saved_tool_parameters.json')
 
         # Retrieve tool parameters from GUI
         args = self.tool_widget.get_widgets_arguments()
@@ -240,19 +280,13 @@ class MainWindow(QMainWindow):
                     tool_params = data
 
         with open(json_file, 'w') as new_file:
-            tool_params[self.current_tool_api] = args
+            tool_params[self.tool_api] = args
             json.dump(tool_params, new_file, indent=4)
 
     def get_current_tool_parameters(self):
         tool_params = bt.get_bera_tool_parameters(self.tool_name)
-        self.current_tool_api = tool_params['tool_api']
+        self.tool_api = tool_params['tool_api']
         return tool_params
-
-    # read selection when tool selected from treeview then call self.update_tool_help
-    def tree_update_tool_help(self, event):
-        cur_item = self.tool_tree.focus()
-        self.tool_name = self.tool_tree.item(cur_item).get('text').replace("  ", "")
-        self.update_tool_info()
 
     # read selection when tool selected from search results then call self.update_tool_help
     def update_search_tool_info(self, event):
@@ -263,11 +297,7 @@ class MainWindow(QMainWindow):
         if self.search_tool_selected:
             print("Index {} selected".format(self.search_tool_selected[0]))
 
-    def update_tool_info(self):
-        self.out_text.delete('1.0', tk.END)
-        for widget in self.arg_scroll_frame.winfo_children():
-            widget.destroy()
-
+    def update_tool_info(self, new, old):
         k = bt.get_bera_tool_info(self.tool_name)
         self.print_to_output(k)
         self.print_to_output('\n')
@@ -453,7 +483,7 @@ class MainWindow(QMainWindow):
             return
 
         self.print_line_to_output("")
-        self.print_line_to_output('Staring tool {} ...'.format(self.tool_name))
+        self.print_line_to_output(f'Staring tool {self.tool_name} ...')
         self.print_line_to_output(bt.ascii_art)
         self.print_line_to_output("Tool arguments:")
         self.print_line_to_output(json.dumps(args, indent=4))
@@ -469,14 +499,14 @@ class MainWindow(QMainWindow):
 
         # disable button
         # self.run_button.config(text='Running', state='disabled')
-        if bt.run_tool_bt(self.current_tool_api, args, self.custom_callback) == 1:
+        if bt.run_tool_bt(self.tool_api, args, self.custom_callback) == 1:
             print("Error running {}".format(self.tool_name))
             # restore Run button
             # self.run_button.config(text='Run', state='enable')
         else:
-            self.progress_var.set(0)
-            self.progress_label['text'] = "Progress:"
-            self.progress.update_idletasks()
+            self.progress_var = 0
+            self.progress_label.setText('Progress:')
+            self.progress_bar.update()
             # restore Run button
             # self.run_button.config(text='Run', state='enable')
 
@@ -496,7 +526,7 @@ class MainWindow(QMainWindow):
         bt.cancel_op = True
         self.print_line_to_output('------------------------------------')
         self.print_line_to_output("Tool operation cancelling...")
-        self.progress.update_idletasks()
+        self.progress_bar.update_idletasks()
 
     def show_advanced(self):
         if not self.show_advanced_button or len(self.arg_scroll_frame.winfo_children()) <= 0:
@@ -556,7 +586,7 @@ class MainWindow(QMainWindow):
                 str_progress = extract_string_from_printout(value, '%')
                 value = value.replace(str_progress, '').strip()  # remove progress string
                 progress = float(str_progress.replace("%", "").strip())
-                self.progress_var.set(int(progress))
+                self.progress_bar.setValue(int(progress))
             except ValueError as e:
                 print("custom_callback: Problem converting parsed data into number: ", e)
             except Exception as e:
@@ -566,7 +596,7 @@ class MainWindow(QMainWindow):
             value = value.replace(str_label, '').strip()  # remove progress string
             value = value.replace('"', '')
             str_label = str_label.replace("PROGRESS_LABEL", "").strip()
-            self.progress_label['text'] = str_label
+            self.progress_label.setText(str_label)
 
         if value != '':
             self.print_line_to_output(value)
@@ -579,6 +609,9 @@ class MainWindow(QMainWindow):
         self.out_text.see(tk.INSERT)
         return 'break'
 
+
+# start @ the beginning
+faulthandler.enable()
 
 app = QApplication(sys.argv)
 

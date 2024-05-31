@@ -162,6 +162,13 @@ class BeraTools(object):
     def get_working_dir(self):
         return self.work_dir
 
+    def get_data_folder(self):
+        data_folder = Path(self.setting_file).parent
+        if not data_folder.exists():
+            data_folder.mkdir()
+
+        return data_folder.as_posix()
+
     def get_verbose_mode(self):
         return self.verbose
 
@@ -241,12 +248,13 @@ class BeraTools(object):
 
             tool_name = self.get_bera_tool_name(tool_api)
             tool_type = self.get_bera_tool_type(tool_name)
+            tool_args = None
             if tool_type == 'python':
-                args_tool = ['python', os.path.join(r'..\tools', tool_api + '.py'),
+                tool_args = ['python', os.path.join(r'..\tools', tool_api + '.py'),
                              '-i', args_string, '-p', str(self.get_max_procs()), '-v', str(self.verbose)]
             elif tool_type == 'executable':
                 print(globals().get(tool_api))
-                args_tool = globals()[tool_api](args_string)
+                tool_args = globals()[tool_api](args_string)
                 # change working dir
                 work_dir = os.getcwd()
                 lapis_path = Path(work_dir).parent.joinpath('./third_party/Lapis_0_8')
@@ -256,11 +264,11 @@ class BeraTools(object):
                 si = STARTUPINFO()
                 si.dwFlags = STARTF_USESHOWWINDOW
                 si.wShowWindow = 7  # Set window minimized and not activated
-                proc = Popen(args_tool, shell=False, stdout=PIPE,
+                proc = Popen(tool_args, shell=False, stdout=PIPE,
                              stderr=STDOUT, bufsize=1, universal_newlines=True,
                              startupinfo=si)
             else:
-                proc = Popen(args_tool, shell=False, stdout=PIPE,
+                proc = Popen(tool_args, shell=False, stdout=PIPE,
                              stderr=STDOUT, bufsize=1, universal_newlines=True)
 
             while proc is not None:
@@ -286,7 +294,7 @@ class BeraTools(object):
                 else:
                     break
 
-            out_str = '{} tool finished'.format(self.get_bera_tool_name(tool_api))
+            out_str = f'{tool_name} tool finished'
             sep_str = '-' * len(out_str)
             callback(sep_str)
             callback(out_str)

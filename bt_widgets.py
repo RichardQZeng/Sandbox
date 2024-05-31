@@ -24,7 +24,7 @@ bt = BeraTools()
 class ToolWidgets(QWidget):
     signal_save_tool_params = pyqtSignal(object)
 
-    def __init__(self, tool_name, parent=None):
+    def __init__(self, tool_name, tool_args=None, parent=None):
         super(ToolWidgets, self).__init__(parent)
 
         self.tool_name = tool_name
@@ -32,7 +32,7 @@ class ToolWidgets(QWidget):
         self.widget_list = []
         self.setWindowTitle("Tool widgets")
 
-        self.create_widgets()
+        self.create_widgets(tool_args)
         layout = QVBoxLayout()
 
         for item in self.widget_list:
@@ -69,15 +69,17 @@ class ToolWidgets(QWidget):
         self.current_tool_api = tool_params['tool_api']
         return tool_params
 
-    def create_widgets(self):
+    def create_widgets(self, tool_args=None):
         k = bt.get_bera_tool_info(self.tool_name)
         print(k)
         print('\n')
 
-        j = self.get_current_tool_parameters()
+        if not tool_args:
+            j = self.get_current_tool_parameters()
+            tool_args = j['parameters']
 
         param_num = 0
-        for p in j['parameters']:
+        for p in tool_args:
             json_str = json.dumps(p, sort_keys=True, indent=2, separators=(',', ': '))
             pt = p['parameter_type']
             widget = None
@@ -160,13 +162,15 @@ class FileSelector(QWidget):
             self.file_type = j['parameter_type']['NewFile']
         self.optional = j['optional']
         self.value = j['default_value']
+        if 'saved_value' in j.keys():
+            self.value = j['saved_value'] \
 
         self.runner = runner
 
         self.layout = QHBoxLayout()
         self.label = QLabel(self.name)
         self.label.setMinimumWidth(BT_LABEL_MIN_WIDTH)
-        self.in_file = QLineEdit()
+        self.in_file = QLineEdit(self.value)
         self.btn_select = QPushButton("...")
         self.btn_select.clicked.connect(self.select_file)
         self.layout.addWidget(self.label)
@@ -305,8 +309,9 @@ class OptionsInput(QWidget):
         self.parameter_type = j['parameter_type']
         self.optional = j['optional']
         self.data_type = j['data_type']
-        self.default_value = str(j['default_value'])
-        self.value = self.default_value  # initialize in event of no default and no selection
+        self.value = str(j['default_value'])
+        if 'saved_value' in j.keys():
+            self.value = j['saved_value']
 
         self.label = QLabel(self.name)
         self.label.setMinimumWidth(BT_LABEL_MIN_WIDTH)
@@ -321,7 +326,7 @@ class OptionsInput(QWidget):
         values = ()
         for v in self.option_list:
             values += (v,)
-            if v == str(self.default_value):
+            if v == str(self.value):
                 default_index = i - 1
             i = i + 1
 
@@ -337,7 +342,7 @@ class OptionsInput(QWidget):
         self.value = self.option_list[i]
 
     def set_value(self, value):
-        self.value = self.value
+        self.value = value
         for v in self.option_list:
             if value == v:
                 self.combobox.setCurrentIndex(self.option_list.index(v))
@@ -357,8 +362,12 @@ class DataInput(QWidget):
         self.flag = j['flag']
         self.parameter_type = j['parameter_type']
         self.optional = j['optional']
+
         self.default_value = j['default_value']
-        self.data = j['default_value']
+        if 'saved_value' in j.keys():
+            self.default_value = j['saved_value']
+
+        self.data = self.default_value
         self.label = QLabel(self.name)
         self.label.setMinimumWidth(BT_LABEL_MIN_WIDTH)
         self.data_input = None
@@ -405,6 +414,7 @@ class DataInput(QWidget):
         if self.data_input:
             self.data_input.setValue(value)
             self.update_value()
+
 
 class DoubleSlider(QSlider):
 

@@ -358,7 +358,7 @@
                     ]
                 },
                 {
-                    "name": "Center Line",
+                    "name": "Centerline",
                     "info": "Determines the least cost path between vertices of the input lines.",
                     "multiprocessing": true,
                     "batch_processing": true,
