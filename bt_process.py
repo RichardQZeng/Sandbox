@@ -1,11 +1,17 @@
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QPlainTextEdit,
-                                QVBoxLayout, QWidget, QProgressBar)
+from PyQt5.QtWidgets import (QApplication,
+                             QMainWindow,
+                             QPushButton,
+                             QPlainTextEdit,
+                             QVBoxLayout,
+                             QWidget,
+                             QProgressBar)
 from PyQt5.QtCore import QProcess
 import sys
 import re
 
 # A regular expression, to extract the % complete.
 progress_re = re.compile("Total complete: (\d+)%")
+
 
 def simple_percent_parser(output):
     """
@@ -24,19 +30,18 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.p = None
-
         self.btn = QPushButton("Execute")
         self.btn.pressed.connect(self.start_process)
-        self.text = QPlainTextEdit()
-        self.text.setReadOnly(True)
+        self.text_edit = QPlainTextEdit()
+        self.text_edit.setReadOnly(True)
 
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
 
         l = QVBoxLayout()
         l.addWidget(self.btn)
-        l.addWidget(self.progress)
-        l.addWidget(self.text)
+        l.addWidget(self.progress_bar)
+        l.addWidget(self.text_edit)
 
         w = QWidget()
         w.setLayout(l)
@@ -44,7 +49,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(w)
 
     def message(self, s):
-        self.text.appendPlainText(s)
+        self.text_edit.appendPlainText(s)
 
     def start_process(self):
         if self.p is None:  # No process running.
@@ -62,7 +67,7 @@ class MainWindow(QMainWindow):
         # Extract progress if it is in the data.
         progress = simple_percent_parser(stderr)
         if progress:
-            self.progress.setValue(progress)
+            self.progress_bar.setValue(progress)
         self.message(stderr)
 
     def handle_stdout(self):

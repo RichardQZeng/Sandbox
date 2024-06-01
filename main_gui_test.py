@@ -3,6 +3,7 @@ import glob
 import platform
 import webbrowser
 import faulthandler
+import re
 
 from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, pyqtSignal
 from PyQt5.QtWidgets import (
@@ -15,7 +16,7 @@ from PyQt5.QtWidgets import (
     QTreeView,
     QAbstractItemView,
     QListWidgetItem,
-    QTextEdit,
+    QPlainTextEdit,
     QListWidget,
     QGroupBox,
     QLineEdit,
@@ -28,8 +29,23 @@ from PyQt5.QtGui import *
 
 from bt_widgets import ToolWidgets
 from beratools_main import *
+from bt_thread import *
+
+# A regular expression, to extract the % complete.
+progress_re = re.compile("Total complete: (\d+)%")
 
 bt = BeraTools()
+
+
+def simple_percent_parser(output):
+    """
+    Matches lines using the progress_re regex,
+    returning a single integer for the % progress.
+    """
+    m = progress_re.search(output)
+    if m:
+        pc_complete = m.group(1)
+        return int(pc_complete)
 
 
 class BTTreeView(QTreeView):
@@ -133,6 +149,10 @@ class MainWindow(QMainWindow):
         if bt.get_max_procs() <= 0:
             bt.set_max_procs(max_cores)
 
+        # thread pool to run tools
+        self.threadpool = QThreadPool()
+        self.p = None
+
         # BERA tool list
         if platform.system() == 'Windows':
             self.ext = '.exe'
@@ -192,7 +212,8 @@ class MainWindow(QMainWindow):
         self.tool_widget = ToolWidgets(self.recent_tool)
 
         # Text widget
-        self.text_widget = QTextEdit()
+        self.text_edit = QPlainTextEdit()
+        self.text_edit.setReadOnly(True)
 
         # progress bar
         self.progress_label = QLabel()
@@ -233,12 +254,12 @@ class MainWindow(QMainWindow):
 
         self.right_layout.addWidget(self.tool_widget)
         self.right_layout.addLayout(button_layout)
-        self.right_layout.addWidget(self.text_widget)
+        self.right_layout.addWidget(self.text_edit)
         self.right_layout.addLayout(progress_layout)
 
         # signals and slots
         # self.button_run.clicked.connect(self.start_run_tool_thread)
-        self.button_run.clicked.connect(self.run_tool)
+        self.button_run.clicked.connect(self.start_process)
 
         widget = QWidget(self)
         widget.setLayout(page_layout)
@@ -474,7 +495,7 @@ class MainWindow(QMainWindow):
         t.daemon = True
         t.start()
 
-    def run_tool(self):
+    def run_tool(self, progress_callback):
         bt.set_working_dir(self.working_dir)
 
         args = self.tool_widget.get_widgets_arguments()
@@ -513,14 +534,14 @@ class MainWindow(QMainWindow):
         return
 
     def print_to_output(self, text):
-        self.text_widget.moveCursor(QTextCursor.End)
-        self.text_widget.insertPlainText(text)
-        self.text_widget.moveCursor(QTextCursor.End)
+        self.text_edit.moveCursor(QTextCursor.End)
+        self.text_edit.insertPlainText(text)
+        self.text_edit.moveCursor(QTextCursor.End)
 
     def print_line_to_output(self, text, tag=None):
-        self.text_widget.moveCursor(QTextCursor.End)
-        self.text_widget.insertPlainText(text)
-        self.text_widget.moveCursor(QTextCursor.End)
+        self.text_edit.moveCursor(QTextCursor.End)
+        self.text_edit.insertPlainText(text)
+        self.text_edit.moveCursor(QTextCursor.End)
 
     def cancel_operation(self):
         bt.cancel_op = True
@@ -608,6 +629,46 @@ class MainWindow(QMainWindow):
         self.out_text.mark_set(tk.INSERT, "1.0")
         self.out_text.see(tk.INSERT)
         return 'break'
+
+    def message(self, s):
+        self.text_edit.appendPlainText(s)
+
+    def start_process(self):
+        if self.p is None:  # No process running.
+            self.message("Executing process")
+            self.p = QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
+            self.p.readyReadStandardOutput.connect(self.handle_stdout)
+            self.p.readyReadStandardError.connect(self.handle_stderr)
+            self.p.stateChanged.connect(self.handle_state)
+            self.p.finished.connect(self.process_finished)  # Clean up once complete.
+            self.p.start("python", ['dummy_script.py'])
+
+    def handle_stderr(self):
+        data = self.p.readAllStandardError()
+        stderr = bytes(data).decode("utf8")
+        # Extract progress if it is in the data.
+        progress = simple_percent_parser(stderr)
+        if progress:
+            self.progress_bar.setValue(progress)
+        self.message(stderr)
+
+    def handle_stdout(self):
+        data = self.p.readAllStandardOutput()
+        stdout = bytes(data).decode("utf8")
+        self.message(stdout)
+
+    def handle_state(self, state):
+        states = {
+            QProcess.NotRunning: 'Not running',
+            QProcess.Starting: 'Starting',
+            QProcess.Running: 'Running',
+        }
+        state_name = states[state]
+        self.message(f"State changed: {state_name}")
+
+    def process_finished(self):
+        self.message("Process finished.")
+        self.p = None
 
 
 # start @ the beginning
