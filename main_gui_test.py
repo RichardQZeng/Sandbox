@@ -5,27 +5,15 @@ import webbrowser
 import faulthandler
 import re
 
-from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, pyqtSignal, QProcess
+from PyQt5.QtCore import (Qt, QItemSelectionModel, QModelIndex, pyqtSignal,
+                          QProcess, QSortFilterProxyModel, QRegExp)
 from PyQt5.QtWidgets import (
-    QApplication,
-    QHBoxLayout,
-    QVBoxLayout,
-    QMainWindow,
-    QPushButton,
-    QWidget,
-    QTreeView,
-    QAbstractItemView,
-    QListWidgetItem,
-    QPlainTextEdit,
-    QListWidget,
-    QGroupBox,
-    QLineEdit,
-    QSlider,
-    QLabel,
-    QProgressBar
+    QApplication, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QWidget, QTreeView,
+    QAbstractItemView, QListWidgetItem, QPlainTextEdit, QListWidget, QGroupBox,
+    QLineEdit, QSlider, QLabel, QProgressBar
 )
 
-from PyQt5.QtGui import *
+from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon
 
 from bt_widgets import *
 from beratools_main import *
@@ -47,25 +35,76 @@ def simple_percent_parser(output):
         return int(pc_complete)
 
 
-class BTTreeView(QTreeView):
+class SearchProxyModel(QSortFilterProxyModel):
+
+    def setFilterRegExp(self, pattern):
+        if isinstance(pattern, str):
+            pattern = QRegExp(pattern, Qt.CaseInsensitive, QRegExp.FixedString)
+        super(SearchProxyModel, self).setFilterRegExp(pattern)
+
+    def _accept_index(self, idx):
+        if idx.isValid():
+            text = idx.data(Qt.DisplayRole)
+            if self.filterRegExp().indexIn(text) >= 0:
+                return True
+            for row in range(idx.model().rowCount(idx)):
+                if self._accept_index(idx.model().index(row, 0, idx)):
+                    return True
+        return False
+
+    def filterAcceptsRow(self, sourceRow, sourceParent):
+        idx = self.sourceModel().index(sourceRow, 0, sourceParent)
+        return self._accept_index(idx)
+
+
+class BTTreeView(QWidget):
     tool_changed = pyqtSignal(str)  # tool selection changed
 
     def __init__(self, parent=None):
         super(BTTreeView, self).__init__(parent)
 
-        self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        # controls
+        self.tool_search = QLineEdit()
+        self.tool_search.setPlaceholderText('Search...')
+
+        self.tags_model = SearchProxyModel()
         self.tree_model = QStandardItemModel()
+        self.tags_model.setSourceModel(self.tree_model)
+        self.tags_model.setDynamicSortFilter(True)
+        self.tags_model.setFilterCaseSensitivity(Qt.CaseInsensitive)
+
+        self.tree_view = QTreeView()
+        self.tree_view.setSortingEnabled(True)
+        self.tree_view.sortByColumn(0, Qt.AscendingOrder)
+        self.tree_view.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tree_view.setHeaderHidden(True)
+        self.tree_view.setRootIsDecorated(True)
+        self.tree_view.setUniformRowHeights(True)
+        self.tree_view.setModel(self.tags_model)
+
+        # layout
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.tool_search)
+        main_layout.addWidget(self.tree_view)
+        self.setLayout(main_layout)
+
+        # signals
+        self.tool_search.textChanged.connect(self.search_text_changed)
+
+        # init
+        first_child = self.create_model()
+
+        self.tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tree_view.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
         self.tree_model.setHorizontalHeaderLabels(['Tools'])
-        self.setModel(self.tree_model)
-        self.setUniformRowHeights(True)
+        # self.setModel(self.tree_model)
+        self.tree_view.setUniformRowHeights(True)
 
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.setFirstColumnSpanned(0, self.rootIndex(), True)
+        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree_view.setFirstColumnSpanned(0, self.tree_view.rootIndex(), True)
 
-        first_child = self.add_tool_list_to_tree(bt.toolbox_list, bt.sorted_tools)
-
-        self.tree_sel_model = self.selectionModel()
+        self.tree_sel_model = self.tree_view.selectionModel()
         self.tree_sel_model.selectionChanged.connect(self.tree_view_selection_changed)
 
         index = None
@@ -76,12 +115,27 @@ class BTTreeView(QTreeView):
             index_set = self.tree_model.index(0, 0)
             index = self.tree_model.indexFromItem(first_child)
             self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-            self.expand(index_set)
+            self.tree_view.expand(index_set)
 
         self.tree_sel_model.setCurrentIndex(index, QItemSelectionModel.Current)
 
-        self.collapsed.connect(self.tree_item_collapsed)
-        self.expanded.connect(self.tree_item_expanded)
+        self.tree_view.collapsed.connect(self.tree_item_collapsed)
+        self.tree_view.expanded.connect(self.tree_item_expanded)
+
+    def create_model(self):
+        model = self.tree_view.model().sourceModel()
+        first_child = self.add_tool_list_to_tree(bt.toolbox_list, bt.sorted_tools)
+        self.tree_view.sortByColumn(0, Qt.AscendingOrder)
+
+        return first_child
+
+    def search_text_changed(self, text=None):
+        self.tags_model.setFilterRegExp(self.tool_search.text())
+
+        if len(self.tool_search.text()) >= 1 and self.tags_model.rowCount() > 0:
+            self.tree_view.expandAll()
+        else:
+            self.tree_view.collapseAll()
 
     def add_tool_list_to_tree(self, toolbox_list, sorted_tools):
         first_child = None
@@ -99,7 +153,9 @@ class BTTreeView(QTreeView):
 
     def tree_view_selection_changed(self, new, old):
         selected = new.indexes()[0]
-        item = self.tree_model.itemFromIndex(selected)
+        # item = self.tree_model.itemFromIndex(selected)
+        source_index = self.tags_model.mapToSource(selected)
+        item = self.tree_model.itemFromIndex(source_index)
         parent = item.parent()
         if not parent:
             return
@@ -109,12 +165,16 @@ class BTTreeView(QTreeView):
         self.tool_changed.emit(tool)
 
     def tree_item_expanded(self, index):
-        item = self.tree_model.itemFromIndex(index)
-        item.setIcon(QIcon('img/open.gif'))
+        # item = self.tree_model.itemFromIndex(index)
+        source_index = self.tags_model.mapToSource(index)
+        item = self.tree_model.itemFromIndex(source_index)
+        if item:
+            item.setIcon(QIcon('img/open.gif'))
 
     def tree_item_collapsed(self, index):
         item = self.tree_model.itemFromIndex(index)
-        item.setIcon(QIcon('img/close.gif'))
+        if item:
+            item.setIcon(QIcon('img/close.gif'))
 
     def select_tool(self, tool_name):
         item = self.tree_model.findItems(tool_name, Qt.MatchExactly | Qt.MatchRecursive)
@@ -123,7 +183,7 @@ class BTTreeView(QTreeView):
 
         index = self.tree_model.indexFromItem(item)
         self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.expand(index.parent())
+        self.tree_view.expand(index.parent())
 
         return index
 
@@ -132,9 +192,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("My App")
         self.script_dir = os.path.dirname(os.path.realpath(__file__))
         self.title = 'BERA Tools'
+        self.setWindowTitle(self.title)
         self.working_dir = bt.get_working_dir()
         self.tool_api = None
         self.tool_name = 'Centerline'
@@ -181,7 +241,7 @@ class MainWindow(QMainWindow):
         # group box for tree view
         tree_box = QGroupBox()
         tree_box.setTitle('Tools available')
-        tree_layout = QHBoxLayout()
+        tree_layout = QVBoxLayout()
         tree_layout.addWidget(self.tree_view)
         tree_box.setLayout(tree_layout)
 
@@ -196,14 +256,11 @@ class MainWindow(QMainWindow):
         list_widget.addItem(list_widget_item)
 
         # group box
-        tool_search_box = QGroupBox()
-        tool_search_layout = QVBoxLayout()
-        tool_search = QLineEdit()
-        tool_search.setPlaceholderText('Search tool ...')
-        tool_search_layout.addWidget(tool_search)
-        tool_search_layout.addWidget(list_widget)
-        tool_search_box.setTitle('Tool history')
-        tool_search_box.setLayout(tool_search_layout)
+        tool_history_box = QGroupBox()
+        tool_history_layout = QVBoxLayout()
+        tool_history_layout.addWidget(list_widget)
+        tool_history_box.setTitle('Tool history')
+        tool_history_box.setLayout(tool_history_layout)
 
         # ToolWidgets
         tool_args = bt.get_bera_tool_args(self.tool_name)
@@ -248,7 +305,7 @@ class MainWindow(QMainWindow):
         page_layout.addLayout(self.right_layout, 7)
 
         self.left_layout.addWidget(tree_box)
-        self.left_layout.addWidget(tool_search_box)
+        self.left_layout.addWidget(tool_history_box)
 
         self.right_layout.addWidget(self.tool_widget)
         self.right_layout.addLayout(button_layout)
