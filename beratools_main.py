@@ -305,6 +305,56 @@ class BeraTools(object):
             callback(str(err))
             return 1
 
+    def run_tool_bt_qt(self, tool_api, args, callback=None, verbose=True):
+        """
+        Runs a tool and specifies tool arguments.
+        Returns 0 if completes without error.
+        Returns 1 if error encountered (details are sent to callback).
+        Returns 2 if process is cancelled by user.
+        """
+
+        try:
+            if callback is None:
+                callback = self.default_callback
+
+            work_dir = os.getcwd()
+            os.chdir(self.exe_path)
+
+        except (OSError, ValueError, CalledProcessError) as err:
+            callback(str(err))
+            return 1
+        finally:
+            os.chdir(work_dir)
+
+        # Call script using new process to make GUI responsive
+        try:
+            proc = None
+
+            # convert to valid json string
+            args_string = str(args).replace("'", '"')
+            args_string = args_string.replace('True', 'true')
+            args_string = args_string.replace('False', 'false')
+
+            tool_name = self.get_bera_tool_name(tool_api)
+            tool_type = self.get_bera_tool_type(tool_name)
+            tool_args = None
+            if tool_type == 'python':
+                tool_args = [os.path.join(r'..\tools', tool_api + '.py'),
+                             '-i', args_string, '-p', str(self.get_max_procs()), '-v', str(self.verbose)]
+            elif tool_type == 'executable':
+                print(globals().get(tool_api))
+                tool_args = globals()[tool_api](args_string)
+                # change working dir
+                work_dir = os.getcwd()
+                lapis_path = Path(work_dir).parent.joinpath('./third_party/Lapis_0_8')
+                os.chdir(lapis_path.as_posix())
+
+        except (OSError, ValueError, CalledProcessError) as err:
+            callback(str(err))
+            return 1
+
+        return tool_type, tool_args
+
     def about(self):
         """ 
         Retrieves the help description for BERA Tools.

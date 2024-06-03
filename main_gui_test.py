@@ -149,8 +149,7 @@ class MainWindow(QMainWindow):
         if bt.get_max_procs() <= 0:
             bt.set_max_procs(max_cores)
 
-        # thread pool to run tools
-        self.threadpool = QThreadPool()
+        # QProcess run tools
         self.p = None
 
         # BERA tool list
@@ -225,16 +224,16 @@ class MainWindow(QMainWindow):
         slider = QSlider(Qt.Horizontal)
         slider.setFixedWidth(300)
         button_layout = QHBoxLayout()
-        self.button_run = QPushButton('Run')
+        button_run = QPushButton('Run')
         button_cancel = QPushButton('Cancel')
-        self.button_run.setFixedWidth(150)
+        button_run.setFixedWidth(150)
         button_cancel.setFixedWidth(150)
         button_layout.setAlignment(Qt.AlignRight)
 
         button_layout.addStretch(1)
         button_layout.addWidget(label)
         button_layout.addWidget(slider)
-        button_layout.addWidget(self.button_run)
+        button_layout.addWidget(button_run)
         button_layout.addWidget(button_cancel)
 
         # progress layout
@@ -259,7 +258,8 @@ class MainWindow(QMainWindow):
 
         # signals and slots
         # self.button_run.clicked.connect(self.start_run_tool_thread)
-        self.button_run.clicked.connect(self.start_process)
+        button_run.clicked.connect(self.start_process)
+        button_cancel.clicked.connect(self.stop_process)
 
         widget = QWidget(self)
         widget.setLayout(page_layout)
@@ -495,7 +495,7 @@ class MainWindow(QMainWindow):
         t.daemon = True
         t.start()
 
-    def run_tool(self, progress_callback):
+    def run_tool(self):
         bt.set_working_dir(self.working_dir)
 
         args = self.tool_widget.get_widgets_arguments()
@@ -634,6 +634,35 @@ class MainWindow(QMainWindow):
         self.text_edit.appendPlainText(s)
 
     def start_process(self):
+        # self.run_tool()
+        # return
+
+        bt.set_working_dir(self.working_dir)
+
+        args = self.tool_widget.get_widgets_arguments()
+        if not args:
+            print('Please check the parameters.')
+            return
+
+        self.print_line_to_output("")
+        self.print_line_to_output(f'Staring tool {self.tool_name} ...')
+        self.print_line_to_output(bt.ascii_art)
+        self.print_line_to_output("Tool arguments:")
+        self.print_line_to_output(json.dumps(args, indent=4))
+        self.print_line_to_output("")
+        self.save_tool_parameter()
+        bt.recent_tool = self.tool_name
+        bt.save_recent_tool()
+
+        # Run the tool and check the return value for an error
+        for key in args.keys():
+            if type(args[key]) is not str:
+                args[key] = str(args[key])
+
+        # disable button
+        # self.run_button.config(text='Running', state='disabled')
+        tool_type, tool_args = bt.run_tool_bt_qt(self.tool_api, args, self.custom_callback)
+
         if self.p is None:  # No process running.
             self.message("Executing process")
             self.p = QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
@@ -641,7 +670,22 @@ class MainWindow(QMainWindow):
             self.p.readyReadStandardError.connect(self.handle_stderr)
             self.p.stateChanged.connect(self.handle_state)
             self.p.finished.connect(self.process_finished)  # Clean up once complete.
-            self.p.start("python", ['dummy_script.py'])
+            # self.p.start("python", ['dummy_script.py'])
+            self.p.start(tool_type, tool_args)
+
+        while self.p is not None:
+            sys.stdout.flush()
+            if bt.cancel_op:
+                bt.cancel_op = False
+                self.p.terminate()
+
+            else:
+                break
+
+    def stop_process(self):
+        bt.cancel_op = True
+        if self.p:
+            self.p.kill()
 
     def handle_stderr(self):
         data = self.p.readAllStandardError()
