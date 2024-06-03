@@ -5,7 +5,7 @@ import webbrowser
 import faulthandler
 import re
 
-from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, pyqtSignal
+from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex, pyqtSignal, QProcess
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -27,9 +27,8 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtGui import *
 
-from bt_widgets import ToolWidgets
+from bt_widgets import *
 from beratools_main import *
-from bt_thread import *
 
 # A regular expression, to extract the % complete.
 progress_re = re.compile("Total complete: (\d+)%")
@@ -107,7 +106,6 @@ class BTTreeView(QTreeView):
 
         toolset = parent.text()
         tool = item.text()
-        # self.set_tool(tool)
         self.tool_changed.emit(tool)
 
     def tree_item_expanded(self, index):
@@ -139,7 +137,7 @@ class MainWindow(QMainWindow):
         self.title = 'BERA Tools'
         self.working_dir = bt.get_working_dir()
         self.tool_api = None
-        self.tool_name = None
+        self.tool_name = 'Centerline'
         self.recent_tool = bt.recent_tool
         if self.recent_tool:
             self.tool_name = self.recent_tool
@@ -178,7 +176,7 @@ class MainWindow(QMainWindow):
         # Tree view
         self.tree_view = BTTreeView()
         self.tree_view.tool_changed.connect(self.set_tool)
-        self.tree_view.tree_sel_model.selectionChanged.connect(self.update_tool_info)
+        # self.tree_view.tree_sel_model.selectionChanged.connect(self.set_tool)
 
         # group box for tree view
         tree_box = QGroupBox()
@@ -208,7 +206,8 @@ class MainWindow(QMainWindow):
         tool_search_box.setLayout(tool_search_layout)
 
         # ToolWidgets
-        self.tool_widget = ToolWidgets(self.recent_tool)
+        tool_args = bt.get_bera_tool_args(self.tool_name)
+        self.tool_widget = ToolWidgets(self.recent_tool, tool_args)
 
         # Text widget
         self.text_edit = QPlainTextEdit()
@@ -265,10 +264,13 @@ class MainWindow(QMainWindow):
         widget.setLayout(page_layout)
         self.setCentralWidget(widget)
 
-    def set_tool(self, tool):
-        self.tool_name = tool
+    def set_tool(self, tool=None):
+        if tool:
+            self.tool_name = tool
+
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
-        self.tool_widget = ToolWidgets(self.tool_name)
+        tool_args = bt.get_bera_tool_args(self.tool_name)
+        self.tool_widget = ToolWidgets(self.tool_name, tool_args)
         widget = self.right_layout.itemAt(0).widget()
         self.right_layout.removeWidget(widget)
         self.right_layout.insertWidget(0, self.tool_widget)
@@ -305,86 +307,22 @@ class MainWindow(QMainWindow):
             json.dump(tool_params, new_file, indent=4)
 
     def get_current_tool_parameters(self):
-        tool_params = bt.get_bera_tool_parameters(self.tool_name)
-        self.tool_api = tool_params['tool_api']
-        return tool_params
+        self.tool_api = bt.get_bera_tool_api(self.tool_name)
+        return bt.get_bera_tool_parameters(self.tool_name)
 
-    # read selection when tool selected from search results then call self.update_tool_help
+    def get_current_tool_args(self):
+        return bt.get_bera_tool_args(self.tool_name)
+
     def update_search_tool_info(self, event):
+        """
+        read selection when tool selected from search results then call self.update_tool_help
+        """
         selection = self.search_results_listbox.curselection()
         self.tool_name = self.search_results_listbox.get(selection[0])
 
-        self.update_tool_info()
+        self.set_tool()
         if self.search_tool_selected:
             print("Index {} selected".format(self.search_tool_selected[0]))
-
-    def update_tool_info(self, new, old):
-        k = bt.get_bera_tool_info(self.tool_name)
-        self.print_to_output(k)
-        self.print_to_output('\n')
-
-        j = self.get_current_tool_parameters()
-
-        param_num = 0
-        for p in j['parameters']:
-            json_str = json.dumps(p, sort_keys=True, indent=2, separators=(',', ': '))
-            pt = p['parameter_type']
-            widget = None
-
-            if 'ExistingFileOrFloat' in pt:
-                widget = FileOrFloat(json_str, self, self.arg_scroll_frame)
-                widget.grid(row=param_num, column=0, sticky=tk.NSEW)
-                param_num = param_num + 1
-            elif 'ExistingFile' in pt or 'NewFile' in pt or 'Directory' in pt:
-                widget = FileSelector(json_str, self, self.arg_scroll_frame)
-                widget.grid(row=param_num, column=0, sticky=tk.NSEW)
-                param_num = param_num + 1
-            elif 'FileList' in pt:
-                widget = MultifileSelector(json_str, self, self.arg_scroll_frame)
-                widget.grid(row=param_num, column=0, sticky=tk.W)
-                param_num = param_num + 1
-            elif 'OptionList' in pt:
-                if 'data_type' in p.keys():
-                    if p['data_type'] == 'Boolean':
-                        widget = BooleanInput(json_str, self.arg_scroll_frame)
-                        widget.grid(row=param_num, column=0, sticky=tk.W)
-                        param_num = param_num + 1
-                    else:
-                        widget = OptionsInput(json_str, self.arg_scroll_frame)
-                        widget.grid(row=param_num, column=0, sticky=tk.W)
-                        param_num = param_num + 1
-            elif ('Float' in pt or 'Integer' in pt or
-                  'Text' in pt or 'String' in pt or 'StringOrNumber' in pt or
-                  'StringList' in pt or 'VectorAttributeField' in pt):
-                widget = DataInput(json_str, self.arg_scroll_frame)
-                widget.grid(row=param_num, column=0, sticky=tk.NSEW)
-                param_num = param_num + 1
-            else:
-                messagebox.showinfo("Error", "Unsupported parameter type: {}.".format(pt))
-
-            param_value = None
-            if 'saved_value' in p.keys():
-                param_value = p['saved_value']
-            if param_value is None:
-                param_value = p['default_value']
-            if param_value is not None:
-                if type(widget) is OptionsInput:
-                    widget.value = param_value
-                elif widget:
-                    widget.value.set(param_value)
-            else:
-                print('No default value found: {}'.format(p['name']))
-
-            # hide optional widgets
-            if widget:
-                if widget.optional and hasattr(widget, 'label'):
-                    widget.label.config(foreground='blue')
-
-                if widget.optional and not bt.show_advanced:
-                    widget.grid_forget()
-
-        self.update_args_box()
-        self.out_text.see("%d.%d" % (1, 0))
 
     def update_toolbox_icon(self, event):
         cur_item = self.tool_tree.focus()
@@ -561,7 +499,7 @@ class MainWindow(QMainWindow):
         if bt.show_advanced:
             self.show_advanced_button.config(text="Hide Advanced Options")
             self.save_tool_parameter()
-            self.update_tool_info()
+            self.set_tool()
         else:
             self.show_advanced_button.config(text="Show Advanced Options")
             for widget in self.arg_scroll_frame.winfo_children():

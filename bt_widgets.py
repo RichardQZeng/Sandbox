@@ -15,16 +15,13 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from beratools_main import BeraTools
 from common import *
-
-bt = BeraTools()
 
 
 class ToolWidgets(QWidget):
     signal_save_tool_params = pyqtSignal(object)
 
-    def __init__(self, tool_name, tool_args=None, parent=None):
+    def __init__(self, tool_name, tool_args, parent=None):
         super(ToolWidgets, self).__init__(parent)
 
         self.tool_name = tool_name
@@ -69,14 +66,14 @@ class ToolWidgets(QWidget):
         self.current_tool_api = tool_params['tool_api']
         return tool_params
 
-    def create_widgets(self, tool_args=None):
-        k = bt.get_bera_tool_info(self.tool_name)
-        print(k)
-        print('\n')
+    def create_widgets(self, tool_args):
+        # k = bt.get_bera_tool_info(self.tool_name)
+        # print(k)
+        # print('\n')
 
-        if not tool_args:
-            j = self.get_current_tool_parameters()
-            tool_args = j['parameters']
+        # if not tool_args:
+        #     j = self.get_current_tool_parameters()
+        #     tool_args = j['parameters']
 
         param_num = 0
         for p in tool_args:
@@ -146,7 +143,7 @@ class ToolWidgets(QWidget):
 
 
 class FileSelector(QWidget):
-    def __init__(self, json_str, runner, master=None, parent=None):
+    def __init__(self, json_str, parent=None):
         super(FileSelector, self).__init__(parent)
 
         # first make sure that the json data has the correct fields
@@ -164,8 +161,6 @@ class FileSelector(QWidget):
         self.value = j['default_value']
         if 'saved_value' in j.keys():
             self.value = j['saved_value'] \
-
-        self.runner = runner
 
         self.layout = QHBoxLayout()
         self.label = QLabel(self.name)
@@ -247,10 +242,6 @@ class FileSelector(QWidget):
 
                 result = str(file_path)
                 self.set_value(result)
-
-            # update the working
-            # if not self.runner and str(result) != '':
-            #     self.runner.working_dir = os.path.dirname(result)
         except:
             t = "file"
             if self.parameter_type == "Directory":
@@ -261,7 +252,8 @@ class FileSelector(QWidget):
             msg_box.setText("Could not find {}".format(t))
             msg_box.exec()
 
-    def get_file_filter_list(self, filter_str):
+    @staticmethod
+    def get_file_filter_list(filter_str):
         """
         Extract filters out of full filter string, split int list and replace first '*'
         Result: ['.shp', '.*']
@@ -280,25 +272,25 @@ class FileSelector(QWidget):
 
 
 class FileOrFloat(QWidget):
-    def __init__(self, json_str, runner, master=None, parent=None):
+    def __init__(self, json_str, parent=None):
         super(FileOrFloat, self).__init__(parent)
         pass
 
 
 class MultifileSelector(QWidget):
-    def __init__(self, json_str, runner, master=None, parent=None):
+    def __init__(self, json_str, parent=None):
         super(MultifileSelector, self).__init__(parent)
         pass
 
 
 class BooleanInput(QWidget):
-    def __init__(self, json_str, master=None, parent=None):
+    def __init__(self, json_str, parent=None):
         super(BooleanInput, self).__init__(parent)
         pass
 
 
 class OptionsInput(QWidget):
-    def __init__(self, json_str, master=None, parent=None):
+    def __init__(self, json_str, parent=None):
         super(OptionsInput, self).__init__(parent)
 
         # first make sure that the json data has the correct fields
@@ -352,7 +344,7 @@ class OptionsInput(QWidget):
 
 
 class DataInput(QWidget):
-    def __init__(self, json_str, master=None, parent=None):
+    def __init__(self, json_str, parent=None):
         super(DataInput, self).__init__(parent)
 
         # first make sure that the json data has the correct fields
@@ -428,9 +420,9 @@ class DoubleSlider(QSlider):
         self.opt = QStyleOptionSlider()
         self.initStyleOption(self.opt)
 
-        self.valueChanged.connect(self.emitDoubleValueChanged)
+        self.valueChanged.connect(self.emit_double_value_changed)
 
-    def emitDoubleValueChanged(self):
+    def emit_double_value_changed(self):
         value = float(super(DoubleSlider, self).value())/self._multi
         self.doubleValueChanged.emit(value)
 
@@ -455,13 +447,16 @@ class DoubleSlider(QSlider):
     def sliderChange(self, change):
         if change == QAbstractSlider.SliderValueChange:
             sr = self.style().subControlRect(QStyle.CC_Slider, self.opt, QStyle.SC_SliderHandle)
-            bottomRightCorner = sr.bottomLeft()
-            QToolTip.showText(self.mapToGlobal(QPoint(bottomRightCorner.x(), bottomRightCorner.y())),
+            bottom_right_corner = sr.bottomLeft()
+            QToolTip.showText(self.mapToGlobal(QPoint(bottom_right_corner.x(), bottom_right_corner.y())),
                               str(self.value()), self)
 
 
 if __name__ == '__main__':
+    from beratools_main import BeraTools
+    bt = BeraTools()
+
     app = QApplication(sys.argv)
-    dlg = ToolWidgets('Raster Line Attributes')
+    dlg = ToolWidgets('Raster Line Attributes', bt.get_bera_tool_args('Raster Line Attributes'))
     dlg.show()
     sys.exit(app.exec_())

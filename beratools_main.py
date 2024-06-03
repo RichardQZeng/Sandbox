@@ -470,6 +470,9 @@ class BeraTools(object):
                 new_params[key] = value
 
         # convert json format for parameters
+        if 'parameters' not in tool.keys():
+            print('issue')
+
         for param in tool['parameters']:
             new_param = {'name': param['parameter']}
             if 'variable' in param.keys():
@@ -534,6 +537,12 @@ class BeraTools(object):
             new_params['parameters'].append(new_param)
 
         return new_params
+
+    def get_bera_tool_args(self, tool_name):
+        params = self.get_bera_tool_parameters(tool_name)
+        tool_args = params['parameters']
+
+        return tool_args
 
     def get_bera_tool_parameters_list(self, tool_name):
         params = self.get_bera_tool_parameters(tool_name)
