@@ -273,14 +273,14 @@ class MainWindow(QMainWindow):
         tree_box.setLayout(tree_layout)
 
         # QListWidget
-        tool_history = BTListView()
-        tool_history.set_data_list(bt.tool_history)
-        tool_history.tool_changed.connect(self.set_tool)
+        self.tool_history = BTListView()
+        self.tool_history.set_data_list(bt.tool_history)
+        self.tool_history.tool_changed.connect(self.set_tool)
 
         # group box
         tool_history_box = QGroupBox()
         tool_history_layout = QVBoxLayout()
-        tool_history_layout.addWidget(tool_history)
+        tool_history_layout.addWidget(self.tool_history)
         tool_history_box.setTitle('Tool history')
         tool_history_box.setLayout(tool_history_layout)
 
@@ -378,6 +378,11 @@ class MainWindow(QMainWindow):
         bt.load_saved_tool_info()
         bt.add_tool_history(self.tool_api, args)
         bt.save_tool_info()
+
+        # update tool history list
+        # TODO use signal
+        bt.get_tool_history()
+        self.tool_history.set_data_list(bt.tool_history)
 
     def get_current_tool_parameters(self):
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
