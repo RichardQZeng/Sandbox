@@ -105,6 +105,12 @@ class BTData(object):
         self.settings['tool_history'][tool] = params
 
     def save_tool_info(self):
+        if self.recent_tool:
+            if 'gui_parameters' not in self.settings.keys():
+                self.settings['gui_parameters'] = {}
+
+            self.settings['gui_parameters']['recent_tool'] = self.recent_tool
+
         with open(self.setting_file, 'w') as file_setting:
             try:
                 json.dump(self.settings, file_setting, indent=4)

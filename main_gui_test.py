@@ -94,30 +94,24 @@ class BTTreeView(QWidget):
         first_child = self.create_model()
 
         self.tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tree_view.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-        self.tree_model.setHorizontalHeaderLabels(['Tools'])
+        self.tree_view.setFirstColumnSpanned(0, self.tree_view.rootIndex(), True)
         self.tree_view.setUniformRowHeights(True)
 
-        self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.tree_view.setFirstColumnSpanned(0, self.tree_view.rootIndex(), True)
-
+        self.tree_model.setHorizontalHeaderLabels(['Tools'])
         self.tree_sel_model = self.tree_view.selectionModel()
         self.tree_sel_model.selectionChanged.connect(self.tree_view_selection_changed)
 
         index = None
+        # select recent tool
         if bt.recent_tool:
-            # select recent tool
-            index = self.select_tool(bt.recent_tool)
+            index = self.get_tool_index(bt.recent_tool)
         else:
             # index_set = self.tree_model.index(0, 0)
             index = self.tree_model.indexFromItem(first_child)
 
-        proxy_index = self.tags_model.mapFromSource(index)
-        self.tree_sel_model.select(proxy_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.tree_view.expand(proxy_index.parent())
-        self.tree_sel_model.setCurrentIndex(proxy_index, QItemSelectionModel.Current)
-
+        self.select_tool_by_index(index)
         self.tree_view.collapsed.connect(self.tree_item_collapsed)
         self.tree_view.expanded.connect(self.tree_item_expanded)
 
@@ -169,24 +163,33 @@ class BTTreeView(QWidget):
         source_index = self.tags_model.mapToSource(index)
         item = self.tree_model.itemFromIndex(source_index)
         if item:
-            item.setIcon(QIcon('img/open.gif'))
+            if item.hasChildren():
+                item.setIcon(QIcon('img/open.gif'))
 
     def tree_item_collapsed(self, index):
         source_index = self.tags_model.mapToSource(index)
         item = self.tree_model.itemFromIndex(source_index)
         if item:
-            item.setIcon(QIcon('img/close.gif'))
+            if item.hasChildren():
+                item.setIcon(QIcon('img/close.gif'))
 
-    def select_tool(self, tool_name):
+    def get_tool_index(self, tool_name):
         item = self.tree_model.findItems(tool_name, Qt.MatchExactly | Qt.MatchRecursive)
         if len(item) > 0:
             item = item[0]
 
         index = self.tree_model.indexFromItem(item)
-        # self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        # self.tree_view.expand(index.parent())
-
         return index
+
+    def select_tool_by_index(self, index):
+        proxy_index = self.tags_model.mapFromSource(index)
+        self.tree_sel_model.select(proxy_index, QItemSelectionModel.ClearAndSelect)
+        self.tree_view.expand(proxy_index.parent())
+        self.tree_sel_model.setCurrentIndex(proxy_index, QItemSelectionModel.Current)
+
+    def select_tool_by_name(self, name):
+        index = self.get_tool_index(name)
+        self.select_tool_by_index(index)
 
 
 class BTListView(QListView):
@@ -261,7 +264,6 @@ class MainWindow(QMainWindow):
         # Tree view
         self.tree_view = BTTreeView()
         self.tree_view.tool_changed.connect(self.set_tool)
-        # self.tree_view.tree_sel_model.selectionChanged.connect(self.set_tool)
 
         # group box for tree view
         tree_box = QGroupBox()
@@ -344,6 +346,10 @@ class MainWindow(QMainWindow):
     def set_tool(self, tool=None):
         if tool:
             self.tool_name = tool
+
+        # tree view select tool
+        # TODO use signal
+        self.tree_view.select_tool_by_name(self.tool_name)
 
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
         tool_args = bt.get_bera_tool_args(self.tool_name)
@@ -514,9 +520,9 @@ class MainWindow(QMainWindow):
         self.print_line_to_output("Tool arguments:")
         self.print_line_to_output(json.dumps(args, indent=4))
         self.print_line_to_output("")
-        self.save_tool_parameter()
+
         bt.recent_tool = self.tool_name
-        # bt.save_recent_tool()
+        self.save_tool_parameter()
 
         # Run the tool and check the return value for an error
         for key in args.keys():
@@ -647,9 +653,9 @@ class MainWindow(QMainWindow):
         self.print_line_to_output("Tool arguments:")
         self.print_line_to_output(json.dumps(args, indent=4))
         self.print_line_to_output("")
-        self.save_tool_parameter()
+
         bt.recent_tool = self.tool_name
-        # bt.save_recent_tool()
+        self.save_tool_parameter()
 
         # Run the tool and check the return value for an error
         for key in args.keys():
