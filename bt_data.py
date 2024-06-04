@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 import platform
 import json
+from json.decoder import JSONDecodeError
 import multiprocessing
 from subprocess import CalledProcessError, Popen, PIPE, STDOUT
 
@@ -36,7 +37,7 @@ def default_callback(value):
     print(value)
 
 
-class BeraTools(object):
+class BTData(object):
     """ 
     An object for interfacing with the BERA Tools executable.
     """
@@ -77,7 +78,10 @@ class BeraTools(object):
             self.setting_file = self.setting_file.as_posix()
             # read the saved_tool_parameters.json file if it exists
             with open(self.setting_file, 'r') as settings_file:
-                settings = json.load(settings_file)
+                try:
+                    settings = json.load(settings_file)
+                except JSONDecodeError:
+                    settings = {}
 
             # parse file
             if 'gui_parameters' in settings.keys():
@@ -133,7 +137,10 @@ class BeraTools(object):
         if os.path.isfile(self.setting_file):
             # read the settings.json file if it exists
             with open(self.setting_file, 'r') as read_settings_file:
-                settings = json.load(read_settings_file)
+                try:
+                    settings = json.load(read_settings_file)
+                except JSONDecodeError:
+                    settings = {}
 
             if not settings:
                 settings = {}
@@ -199,22 +206,16 @@ class BeraTools(object):
     def get_max_cpu_cores(self):
         return self.__max_cpu_cores
 
-    def save_recent_tool(self):
-        gui_settings = {}
-        if os.path.isfile(self.setting_file):
-            # read the settings.json file if it exists
-            with open(self.setting_file, 'r') as settings_file:
-                gui_settings = json.load(settings_file)
-        else:
-            print("Settings.json not exist, creat one.")
-
-        if self.recent_tool and len(self.recent_tool) > 0:
-            if 'gui_parameters' not in gui_settings.keys():
-                gui_settings['gui_parameters'] = {}
-
-            gui_settings['gui_parameters']['recent_tool'] = self.recent_tool
-            with open(self.setting_file, 'w') as settings_file:
-                json.dump(gui_settings, settings_file, indent=4)
+    # def save_recent_tool(self):
+    #     gui_settings = self.load_saved_tool_info()
+    #
+    #     if self.recent_tool and len(self.recent_tool) > 0:
+    #         if 'gui_parameters' not in gui_settings.keys():
+    #             gui_settings['gui_parameters'] = {}
+    #
+    #         gui_settings['gui_parameters']['recent_tool'] = self.recent_tool
+    #         with open(self.setting_file, 'w') as settings_file:
+    #             json.dump(gui_settings, settings_file, indent=4)
 
     def run_tool_bt(self, tool_api, args, callback=None, verbose=True):
         """ 
@@ -392,22 +393,30 @@ class BeraTools(object):
         finally:
             os.chdir(work_dir)
 
-    def get_saved_tool_parameter(self, tool, variable):
+    def load_saved_tool_info(self):
         data_path = Path(self.setting_file).parent
         if not data_path.exists():
             data_path.mkdir()
 
-        # json_file = data_path.joinpath(data_path, 'saved_tool_parameters.json')
         json_file = Path(self.setting_file)
         if json_file.exists():
             with open(json_file) as open_file:
-                saved_parameters = json.load(open_file)
-                if tool in list(saved_parameters.keys()):
-                    tool_params = saved_parameters[tool]
-                    if tool_params:
-                        if variable in tool_params.keys():
-                            saved_value = tool_params[variable]
-                            return saved_value
+                try:
+                    saved_parameters = json.load(open_file)
+                except json.decoder.JSONDecodeError:
+                    saved_parameters = {}
+
+        return saved_parameters
+
+    def get_saved_tool_params(self, tool, variable):
+        saved_parameters = self.load_saved_tool_info()
+
+        if tool in list(saved_parameters.keys()):
+            tool_params = saved_parameters[tool]
+            if tool_params:
+                if variable in tool_params.keys():
+                    saved_value = tool_params[variable]
+                    return saved_value
 
         return None
 
@@ -453,7 +462,7 @@ class BeraTools(object):
                 if tool['name'] == tool_name:
                     return tool['info']
 
-    def get_bera_tool_parameters(self, tool_name):
+    def get_bera_tool_params(self, tool_name):
         new_params = {'parameters': []}
         tool = {}
         batch_tool_list = []
@@ -478,7 +487,7 @@ class BeraTools(object):
             if 'variable' in param.keys():
                 new_param['flag'] = param['variable']
                 # restore saved parameters
-                saved_value = self.get_saved_tool_parameter(tool['tool_api'], param['variable'])
+                saved_value = self.get_saved_tool_params(tool['tool_api'], param['variable'])
                 if saved_value is not None:
                     new_param['saved_value'] = saved_value
             else:
@@ -539,13 +548,13 @@ class BeraTools(object):
         return new_params
 
     def get_bera_tool_args(self, tool_name):
-        params = self.get_bera_tool_parameters(tool_name)
+        params = self.get_bera_tool_params(tool_name)
         tool_args = params['parameters']
 
         return tool_args
 
     def get_bera_tool_parameters_list(self, tool_name):
-        params = self.get_bera_tool_parameters(tool_name)
+        params = self.get_bera_tool_params(tool_name)
         param_list = {}
         for item in params['parameters']:
             param_list[item['flag']] = item['default_value']

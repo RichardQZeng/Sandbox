@@ -53,7 +53,7 @@ class ToolWidgets(QWidget):
             if v and len(v) == 2:
                 args[v[0]] = v[1]
             else:
-                self.print_line_to_output(f'[Missing argument]: {widget.name} parameter not specified.', 'missing')
+                print(f'[Missing argument]: {widget.name} parameter not specified.', 'missing')
                 param_missing = True
 
         if param_missing:
@@ -62,7 +62,7 @@ class ToolWidgets(QWidget):
         return args
 
     def get_current_tool_parameters(self):
-        tool_params = bt.get_bera_tool_parameters(self.tool_name)
+        tool_params = bt.get_bera_tool_params(self.tool_name)
         self.current_tool_api = tool_params['tool_api']
         return tool_params
 
@@ -355,11 +355,10 @@ class DataInput(QWidget):
         self.parameter_type = j['parameter_type']
         self.optional = j['optional']
 
-        self.default_value = j['default_value']
+        self.value = j['default_value']
         if 'saved_value' in j.keys():
-            self.default_value = j['saved_value']
+            self.value = j['saved_value']
 
-        self.data = self.default_value
         self.label = QLabel(self.name)
         self.label.setMinimumWidth(BT_LABEL_MIN_WIDTH)
         self.data_input = None
@@ -370,7 +369,7 @@ class DataInput(QWidget):
             self.data_input = QDoubleSpinBox()
 
         if self.data_input:
-            self.data_input.setValue(self.data)
+            self.data_input.setValue(self.value)
 
         self.data_input.valueChanged.connect(self.update_value)
 
@@ -380,17 +379,17 @@ class DataInput(QWidget):
         self.setLayout(self.layout)
 
     def update_value(self):
-        self.data = self.data_input.value
+        self.value = self.data_input.value()
 
     def get_value(self):
-        v = self.data
-        if v:
+        v = self.value
+        if v is not None:
             if "Integer" in self.parameter_type:
-                return self.flag, int(self.data)
+                return self.flag, int(self.value)
             elif "Float" in self.parameter_type:
-                return self.flag, float(self.data)
+                return self.flag, float(self.value)
             elif "Double" in self.parameter_type:
-                return self.flag, float(self.data)
+                return self.flag, float(self.value)
             else:  # String or StringOrNumber types
                 return self.flag, self.value
         else:
@@ -453,8 +452,8 @@ class DoubleSlider(QSlider):
 
 
 if __name__ == '__main__':
-    from beratools_main import BeraTools
-    bt = BeraTools()
+    from bt_data import BTData
+    bt = BTData()
 
     app = QApplication(sys.argv)
     dlg = ToolWidgets('Raster Line Attributes', bt.get_bera_tool_args('Raster Line Attributes'))

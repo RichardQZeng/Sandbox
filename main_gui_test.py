@@ -1,4 +1,3 @@
-import threading
 import glob
 import platform
 import webbrowser
@@ -13,15 +12,15 @@ from PyQt5.QtWidgets import (
     QLineEdit, QSlider, QLabel, QProgressBar
 )
 
-from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon
+from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor
 
 from bt_widgets import *
-from beratools_main import *
+from bt_data import *
 
 # A regular expression, to extract the % complete.
 progress_re = re.compile("Total complete: (\d+)%")
 
-bt = BeraTools()
+bt = BTData()
 
 
 def simple_percent_parser(output):
@@ -367,26 +366,17 @@ class MainWindow(QMainWindow):
             self.tool_name = self.tools_list[0]
 
     def save_tool_parameter(self):
-        data_path = bt.get_data_folder()
-        json_file = Path(data_path).joinpath('saved_tool_parameters.json')
-
         # Retrieve tool parameters from GUI
         args = self.tool_widget.get_widgets_arguments()
+        tool_params = bt.load_saved_tool_info()
 
-        tool_params = {}
-        if json_file.exists():
-            with open(json_file, 'r') as open_file:
-                data = json.load(open_file)
-                if data:
-                    tool_params = data
-
-        with open(json_file, 'w') as new_file:
+        with open(bt.setting_file, 'w') as new_file:
             tool_params[self.tool_api] = args
             json.dump(tool_params, new_file, indent=4)
 
     def get_current_tool_parameters(self):
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
-        return bt.get_bera_tool_parameters(self.tool_name)
+        return bt.get_bera_tool_params(self.tool_name)
 
     def get_current_tool_args(self):
         return bt.get_bera_tool_args(self.tool_name)
@@ -497,7 +487,7 @@ class MainWindow(QMainWindow):
 
     def reset_tool(self):
         for widget in self.arg_scroll_frame.winfo_children():
-            args = bt.get_bera_tool_parameters(self.tool_name)
+            args = bt.get_bera_tool_params(self.tool_name)
             for param in args['parameters']:
                 default_value = param['default_value']
                 if widget.flag == param['flag']:
@@ -506,10 +496,10 @@ class MainWindow(QMainWindow):
                     else:
                         widget.value.set(default_value)
 
-    def start_run_tool_thread(self):
-        t = threading.Thread(target=self.run_tool, args=())
-        t.daemon = True
-        t.start()
+    # def start_run_tool_thread(self):
+    #     t = threading.Thread(target=self.run_tool, args=())
+    #     t.daemon = True
+    #     t.start()
 
     def run_tool(self):
         bt.set_working_dir(self.working_dir)
@@ -527,7 +517,7 @@ class MainWindow(QMainWindow):
         self.print_line_to_output("")
         self.save_tool_parameter()
         bt.recent_tool = self.tool_name
-        bt.save_recent_tool()
+        # bt.save_recent_tool()
 
         # Run the tool and check the return value for an error
         for key in args.keys():
@@ -535,17 +525,12 @@ class MainWindow(QMainWindow):
                 args[key] = str(args[key])
 
         # disable button
-        # self.run_button.config(text='Running', state='disabled')
         if bt.run_tool_bt(self.tool_api, args, self.custom_callback) == 1:
             print("Error running {}".format(self.tool_name))
-            # restore Run button
-            # self.run_button.config(text='Run', state='enable')
         else:
             self.progress_var = 0
             self.progress_label.setText('Progress:')
             self.progress_bar.update()
-            # restore Run button
-            # self.run_button.config(text='Run', state='enable')
 
         return
 
@@ -650,9 +635,6 @@ class MainWindow(QMainWindow):
         self.text_edit.appendPlainText(s)
 
     def start_process(self):
-        # self.run_tool()
-        # return
-
         bt.set_working_dir(self.working_dir)
 
         args = self.tool_widget.get_widgets_arguments()
@@ -668,7 +650,7 @@ class MainWindow(QMainWindow):
         self.print_line_to_output("")
         self.save_tool_parameter()
         bt.recent_tool = self.tool_name
-        bt.save_recent_tool()
+        # bt.save_recent_tool()
 
         # Run the tool and check the return value for an error
         for key in args.keys():
@@ -686,7 +668,6 @@ class MainWindow(QMainWindow):
             self.p.readyReadStandardError.connect(self.handle_stderr)
             self.p.stateChanged.connect(self.handle_state)
             self.p.finished.connect(self.process_finished)  # Clean up once complete.
-            # self.p.start("python", ['dummy_script.py'])
             self.p.start(tool_type, tool_args)
 
         while self.p is not None:
