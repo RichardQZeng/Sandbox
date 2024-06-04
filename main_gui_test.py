@@ -6,10 +6,10 @@ import faulthandler
 import re
 
 from PyQt5.QtCore import (Qt, QItemSelectionModel, QModelIndex, pyqtSignal,
-                          QProcess, QSortFilterProxyModel, QRegExp)
+                          QProcess, QSortFilterProxyModel, QRegExp, QStringListModel)
 from PyQt5.QtWidgets import (
     QApplication, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QWidget, QTreeView,
-    QAbstractItemView, QListWidgetItem, QPlainTextEdit, QListWidget, QGroupBox,
+    QAbstractItemView, QListWidgetItem, QPlainTextEdit, QListView, QGroupBox,
     QLineEdit, QSlider, QLabel, QProgressBar
 )
 
@@ -98,7 +98,6 @@ class BTTreeView(QWidget):
         self.tree_view.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         self.tree_model.setHorizontalHeaderLabels(['Tools'])
-        # self.setModel(self.tree_model)
         self.tree_view.setUniformRowHeights(True)
 
         self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -112,12 +111,13 @@ class BTTreeView(QWidget):
             # select recent tool
             index = self.select_tool(bt.recent_tool)
         else:
-            index_set = self.tree_model.index(0, 0)
+            # index_set = self.tree_model.index(0, 0)
             index = self.tree_model.indexFromItem(first_child)
-            self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-            self.tree_view.expand(index_set)
 
-        self.tree_sel_model.setCurrentIndex(index, QItemSelectionModel.Current)
+        proxy_index = self.tags_model.mapFromSource(index)
+        self.tree_sel_model.select(proxy_index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        self.tree_view.expand(proxy_index.parent())
+        self.tree_sel_model.setCurrentIndex(proxy_index, QItemSelectionModel.Current)
 
         self.tree_view.collapsed.connect(self.tree_item_collapsed)
         self.tree_view.expanded.connect(self.tree_item_expanded)
@@ -152,8 +152,10 @@ class BTTreeView(QWidget):
         return first_child
 
     def tree_view_selection_changed(self, new, old):
+        if len(new.indexes()) == 0:
+            return
+
         selected = new.indexes()[0]
-        # item = self.tree_model.itemFromIndex(selected)
         source_index = self.tags_model.mapToSource(selected)
         item = self.tree_model.itemFromIndex(source_index)
         parent = item.parent()
@@ -165,14 +167,14 @@ class BTTreeView(QWidget):
         self.tool_changed.emit(tool)
 
     def tree_item_expanded(self, index):
-        # item = self.tree_model.itemFromIndex(index)
         source_index = self.tags_model.mapToSource(index)
         item = self.tree_model.itemFromIndex(source_index)
         if item:
             item.setIcon(QIcon('img/open.gif'))
 
     def tree_item_collapsed(self, index):
-        item = self.tree_model.itemFromIndex(index)
+        source_index = self.tags_model.mapToSource(index)
+        item = self.tree_model.itemFromIndex(source_index)
         if item:
             item.setIcon(QIcon('img/close.gif'))
 
@@ -182,10 +184,34 @@ class BTTreeView(QWidget):
             item = item[0]
 
         index = self.tree_model.indexFromItem(item)
-        self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.tree_view.expand(index.parent())
+        # self.tree_sel_model.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        # self.tree_view.expand(index.parent())
 
         return index
+
+
+class BTListView(QListView):
+    tool_changed = pyqtSignal(str)
+
+    def __init__(self, data_list=None, parent=None):
+        super(BTListView, self).__init__(parent)
+
+        self.slm = QStringListModel()  # model
+        if data_list:
+            self.slm.setStringList(data_list)
+
+        self.setModel(self.slm)  # set model
+        self.setFlow(QListView.TopToBottom)
+        self.setBatchSize(5)
+
+        self.clicked.connect(self.clicked_list)
+        self.setLayoutMode(QListView.SinglePass)
+
+    def clicked_list(self, model_index):
+        self.tool_changed.emit(self.slm.data(model_index, Qt.DisplayRole))
+
+    def set_data_list(self, data_list):
+        self.slm.setStringList(data_list)
 
 
 class MainWindow(QMainWindow):
@@ -246,19 +272,14 @@ class MainWindow(QMainWindow):
         tree_box.setLayout(tree_layout)
 
         # QListWidget
-        list_widget = QListWidget()
-
-        QListWidgetItem("Geeks", list_widget)
-        QListWidgetItem("For", list_widget)
-        QListWidgetItem("Geeks", list_widget)
-
-        list_widget_item = QListWidgetItem("GeeksForGeeks")
-        list_widget.addItem(list_widget_item)
+        tool_history = BTListView()
+        tool_history.set_data_list(['Centerline'])
+        tool_history.tool_changed.connect(self.set_tool)
 
         # group box
         tool_history_box = QGroupBox()
         tool_history_layout = QVBoxLayout()
-        tool_history_layout.addWidget(list_widget)
+        tool_history_layout.addWidget(tool_history)
         tool_history_box.setTitle('Tool history')
         tool_history_box.setLayout(tool_history_layout)
 
