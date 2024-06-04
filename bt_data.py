@@ -53,8 +53,7 @@ class BTData(object):
         self.work_dir = ""
         self.verbose = False
         self.show_advanced = BT_SHOW_ADVANCED_OPTIONS
-        self.__compress_rasters = False
-        self.__max_procs = -1
+        self.max_procs = -1
         self.recent_tool = None
         self.ascii_art = None
 
@@ -62,6 +61,8 @@ class BTData(object):
         self.__max_cpu_cores = min(BT_MAXIMUM_CPU_CORES, multiprocessing.cpu_count())
 
         # load bera tools
+        self.tool_history = []
+        self.settings = {}
         self.bera_tools = None
         self.tools_list = []
         self.sorted_tools = []
@@ -74,48 +75,18 @@ class BTData(object):
         self.sort_toolboxes()
 
         self.setting_file = Path(self.exe_path).joinpath(r'.data\saved_tool_parameters.json')
-        if self.setting_file.exists():
-            self.setting_file = self.setting_file.as_posix()
-            # read the saved_tool_parameters.json file if it exists
-            with open(self.setting_file, 'r') as settings_file:
-                try:
-                    settings = json.load(settings_file)
-                except JSONDecodeError:
-                    settings = {}
-
-            # parse file
-            if 'gui_parameters' in settings.keys():
-                gui_settings = settings['gui_parameters']
-                if 'working_directory' in gui_settings.keys():
-                    self.work_dir = str(gui_settings['working_directory'])
-                if 'verbose_mode' in gui_settings.keys():
-                    self.verbose = str(gui_settings['verbose_mode'])
-                if 'compress_rasters' in gui_settings.keys():
-                    self.__compress_rasters = gui_settings['compress_rasters']
-                if 'max_procs' in gui_settings.keys():
-                    self.__max_procs = gui_settings['max_procs']
-                if 'recent_tool' in gui_settings.keys():
-                    self.recent_tool = gui_settings['recent_tool']
-                    if not self.get_bera_tool_api(self.recent_tool):
-                        self.recent_tool = None
-        else:
-            print("aved_tool_parameters.json not exist.")
-
         self.gui_setting_file = Path(self.exe_path).joinpath(r'.data\gui.json')
-        if self.gui_setting_file.exists():
-            self.gui_setting_file = self.gui_setting_file.as_posix()
-            # read the settings.json file if it exists
-            with open(self.gui_setting_file, 'r') as gui_setting_file:
-                gui_settings = json.load(gui_setting_file)
-
-            # parse file
-            if 'ascii_art' in gui_settings.keys():
-                bera_art = ''
-                for line_of_art in gui_settings['ascii_art']:
-                    bera_art += line_of_art
-                self.ascii_art = bera_art
-        else:
-            print("gui.json not exist.")
+        # if self.setting_file.exists():
+        #     self.setting_file = self.setting_file.as_posix()
+        #     # read the saved_tool_parameters.json file if it exists
+        #     with open(self.setting_file, 'r') as settings_file:
+        #         try:
+        #             settings = json.load(settings_file)
+        #         except JSONDecodeError:
+        #             settings = {}
+        self.load_saved_tool_info()
+        self.load_gui_data()
+        self.get_tool_history()
 
         self.cancel_op = False
         self.default_callback = default_callback
@@ -127,34 +98,35 @@ class BTData(object):
         """
         self.exe_path = path_str
 
+    def add_tool_history(self, tool, params):
+        if 'tool_history' not in self.settings:
+            self.settings['tool_history'] = {}
+
+        self.settings['tool_history'][tool] = params
+
+    def save_tool_info(self):
+        with open(self.setting_file, 'w') as file_setting:
+            try:
+                json.dump(self.settings, file_setting, indent=4)
+            except JSONDecodeError:
+                pass
+
     def save_setting(self, key, value):
         # check setting directory existence
         data_path = Path(self.setting_file).resolve().parent
         if not data_path.exists():
             data_path.mkdir()
 
-        settings = {}
-        if os.path.isfile(self.setting_file):
-            # read the settings.json file if it exists
-            with open(self.setting_file, 'r') as read_settings_file:
-                try:
-                    settings = json.load(read_settings_file)
-                except JSONDecodeError:
-                    settings = {}
-
-            if not settings:
-                settings = {}
-        else:
-            print("Settings file not exist, creating one.")
+        self.load_saved_tool_info()
 
         if value is not None:
-            if 'gui_parameters' not in settings.keys():
-                settings['gui_parameters'] = {}
+            if 'gui_parameters' not in self.settings.keys():
+                self.settings['gui_parameters'] = {}
 
-            settings['gui_parameters'][key] = value
+            self.settings['gui_parameters'][key] = value
 
             with open(self.setting_file, 'w') as write_settings_file:
-                json.dump(settings, write_settings_file, indent=4)
+                json.dump(self.settings, write_settings_file, indent=4)
 
     def set_working_dir(self, path_str):
         """ 
@@ -196,12 +168,12 @@ class BTData(object):
         """ 
         Sets the flag used by BERA Tools to determine whether to use compression for output rasters.
         """
-        self.__max_procs = val
+        self.max_procs = val
 
         self.save_setting('max_procs', val)
 
     def get_max_procs(self):
-        return self.__max_procs
+        return self.max_procs
 
     def get_max_cpu_cores(self):
         return self.__max_cpu_cores
@@ -398,25 +370,81 @@ class BTData(object):
         if not data_path.exists():
             data_path.mkdir()
 
+        saved_parameters = {}
         json_file = Path(self.setting_file)
         if json_file.exists():
             with open(json_file) as open_file:
                 try:
                     saved_parameters = json.load(open_file)
                 except json.decoder.JSONDecodeError:
-                    saved_parameters = {}
+                    pass
 
-        return saved_parameters
+        self.settings = saved_parameters
 
-    def get_saved_tool_params(self, tool, variable):
-        saved_parameters = self.load_saved_tool_info()
+        # parse file
+        if 'gui_parameters' in self.settings.keys():
+            gui_settings = self.settings['gui_parameters']
 
-        if tool in list(saved_parameters.keys()):
-            tool_params = saved_parameters[tool]
-            if tool_params:
-                if variable in tool_params.keys():
-                    saved_value = tool_params[variable]
-                    return saved_value
+            if 'working_directory' in gui_settings.keys():
+                self.work_dir = str(gui_settings['working_directory'])
+            if 'verbose_mode' in gui_settings.keys():
+                self.verbose = str(gui_settings['verbose_mode'])
+            else:
+                self.verbose = False
+
+            if 'max_procs' in gui_settings.keys():
+                self.max_procs = gui_settings['max_procs']
+
+            if 'recent_tool' in gui_settings.keys():
+                self.recent_tool = gui_settings['recent_tool']
+                if not self.get_bera_tool_api(self.recent_tool):
+                    self.recent_tool = None
+
+    def load_gui_data(self):
+        gui_settings = {}
+        if not self.gui_setting_file.exists():
+            print("gui.json not exist.")
+        else:
+            # read the settings.json file if it exists
+            with open(self.gui_setting_file, 'r') as file_gui:
+                try:
+                    gui_settings = json.load(file_gui)
+                except json.decoder.JSONDecodeError:
+                    pass
+
+            # parse file
+            if 'ascii_art' in gui_settings.keys():
+                bera_art = ''
+                for line_of_art in gui_settings['ascii_art']:
+                    bera_art += line_of_art
+                self.ascii_art = bera_art
+
+    def get_tool_history(self):
+        tool_history = []
+        self.load_saved_tool_info()
+        if self.settings:
+            if 'tool_history' in self.settings:
+                tool_history = self.settings['tool_history']
+
+        if tool_history:
+            self.tool_history = []
+            for item in tool_history:
+                item = self.get_bera_tool_name(item)
+                self.tool_history.append(item)
+
+    def get_saved_tool_params(self, tool_api, variable=None):
+        self.load_saved_tool_info()
+
+        if 'tool_history' in self.settings:
+            if tool_api in list(self.settings['tool_history']):
+                tool_params = self.settings['tool_history'][tool_api]
+                if tool_params:
+                    if variable:
+                        if variable in tool_params.keys():
+                            saved_value = tool_params[variable]
+                            return saved_value
+                    else:  # return all params
+                        return tool_params
 
         return None
 

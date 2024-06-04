@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
 
         # QListWidget
         tool_history = BTListView()
-        tool_history.set_data_list(['Centerline'])
+        tool_history.set_data_list(bt.tool_history)
         tool_history.tool_changed.connect(self.set_tool)
 
         # group box
@@ -347,6 +347,7 @@ class MainWindow(QMainWindow):
 
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
         tool_args = bt.get_bera_tool_args(self.tool_name)
+
         self.tool_widget = ToolWidgets(self.tool_name, tool_args)
         widget = self.right_layout.itemAt(0).widget()
         self.right_layout.removeWidget(widget)
@@ -368,11 +369,9 @@ class MainWindow(QMainWindow):
     def save_tool_parameter(self):
         # Retrieve tool parameters from GUI
         args = self.tool_widget.get_widgets_arguments()
-        tool_params = bt.load_saved_tool_info()
-
-        with open(bt.setting_file, 'w') as new_file:
-            tool_params[self.tool_api] = args
-            json.dump(tool_params, new_file, indent=4)
+        bt.load_saved_tool_info()
+        bt.add_tool_history(self.tool_api, args)
+        bt.save_tool_info()
 
     def get_current_tool_parameters(self):
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
@@ -482,8 +481,8 @@ class MainWindow(QMainWindow):
             messagebox.showinfo("Warning", "Could not set the number of processors.")
 
     def update_procs(self, value):
-        self.__max_procs = int(value)
-        bt.set_max_procs(self.__max_procs)
+        self.max_procs = int(value)
+        bt.set_max_procs(self.max_procs)
 
     def reset_tool(self):
         for widget in self.arg_scroll_frame.winfo_children():

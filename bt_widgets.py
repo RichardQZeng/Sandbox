@@ -160,7 +160,7 @@ class FileSelector(QWidget):
         self.optional = j['optional']
         self.value = j['default_value']
         if 'saved_value' in j.keys():
-            self.value = j['saved_value'] \
+            self.value = j['saved_value']
 
         self.layout = QHBoxLayout()
         self.label = QLabel(self.name)
