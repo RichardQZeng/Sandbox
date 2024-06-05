@@ -67,14 +67,6 @@ class ToolWidgets(QWidget):
         return tool_params
 
     def create_widgets(self, tool_args):
-        # k = bt.get_bera_tool_info(self.tool_name)
-        # print(k)
-        # print('\n')
-
-        # if not tool_args:
-        #     j = self.get_current_tool_parameters()
-        #     tool_args = j['parameters']
-
         param_num = 0
         for p in tool_args:
             json_str = json.dumps(p, sort_keys=True, indent=2, separators=(',', ': '))
@@ -88,7 +80,7 @@ class ToolWidgets(QWidget):
                 widget = FileSelector(json_str, None)
                 param_num = param_num + 1
             elif 'FileList' in pt:
-                widget = MultifileSelector(json_str, None)
+                widget = MultiFileSelector(json_str, None)
                 param_num = param_num + 1
             elif 'Boolean' in pt:
                 widget = BooleanInput(json_str)
@@ -277,9 +269,9 @@ class FileOrFloat(QWidget):
         pass
 
 
-class MultifileSelector(QWidget):
+class MultiFileSelector(QWidget):
     def __init__(self, json_str, parent=None):
-        super(MultifileSelector, self).__init__(parent)
+        super(MultiFileSelector, self).__init__(parent)
         pass
 
 

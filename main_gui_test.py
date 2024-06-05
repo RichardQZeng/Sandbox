@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QSlider, QLabel, QProgressBar
 )
 
-from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor
+from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont
 
 from bt_widgets import *
 from bt_data import *
@@ -290,6 +290,7 @@ class MainWindow(QMainWindow):
 
         # Text widget
         self.text_edit = QPlainTextEdit()
+        self.text_edit.setFont(QFont('Consolas', 9))
         self.text_edit.setReadOnly(True)
 
         # progress bar
@@ -511,38 +512,38 @@ class MainWindow(QMainWindow):
     #     t.daemon = True
     #     t.start()
 
-    def run_tool(self):
-        bt.set_working_dir(self.working_dir)
-
-        args = self.tool_widget.get_widgets_arguments()
-        if not args:
-            print('Please check the parameters.')
-            return
-
-        self.print_line_to_output("")
-        self.print_line_to_output(f'Staring tool {self.tool_name} ...')
-        self.print_line_to_output(bt.ascii_art)
-        self.print_line_to_output("Tool arguments:")
-        self.print_line_to_output(json.dumps(args, indent=4))
-        self.print_line_to_output("")
-
-        bt.recent_tool = self.tool_name
-        self.save_tool_parameter()
-
-        # Run the tool and check the return value for an error
-        for key in args.keys():
-            if type(args[key]) is not str:
-                args[key] = str(args[key])
-
-        # disable button
-        if bt.run_tool_bt(self.tool_api, args, self.custom_callback) == 1:
-            print("Error running {}".format(self.tool_name))
-        else:
-            self.progress_var = 0
-            self.progress_label.setText('Progress:')
-            self.progress_bar.update()
-
-        return
+    # def run_tool(self):
+    #     bt.set_working_dir(self.working_dir)
+    #
+    #     args = self.tool_widget.get_widgets_arguments()
+    #     if not args:
+    #         print('Please check the parameters.')
+    #         return
+    #
+    #     self.print_line_to_output("")
+    #     self.print_line_to_output(f'Staring tool {self.tool_name} ...')
+    #     self.print_line_to_output(bt.ascii_art)
+    #     self.print_line_to_output("Tool arguments:")
+    #     self.print_line_to_output(json.dumps(args, indent=4))
+    #     self.print_line_to_output("")
+    #
+    #     bt.recent_tool = self.tool_name
+    #     self.save_tool_parameter()
+    #
+    #     # Run the tool and check the return value for an error
+    #     for key in args.keys():
+    #         if type(args[key]) is not str:
+    #             args[key] = str(args[key])
+    #
+    #     # disable button
+    #     if bt.run_tool_bt(self.tool_api, args, self.custom_callback) == 1:
+    #         print("Error running {}".format(self.tool_name))
+    #     else:
+    #         self.progress_var = 0
+    #         self.progress_label.setText('Progress:')
+    #         self.progress_bar.update()
+    #
+    #     return
 
     def print_to_output(self, text):
         self.text_edit.moveCursor(QTextCursor.End)
@@ -551,7 +552,7 @@ class MainWindow(QMainWindow):
 
     def print_line_to_output(self, text, tag=None):
         self.text_edit.moveCursor(QTextCursor.End)
-        self.text_edit.insertPlainText(text)
+        self.text_edit.insertPlainText(text+'\n')
         self.text_edit.moveCursor(QTextCursor.End)
 
     def cancel_operation(self):
@@ -612,6 +613,12 @@ class MainWindow(QMainWindow):
         A custom callback for dealing with tool output.
         """
         value = str(value)
+        value.strip()
+        if value != '':
+            # remove esc string which origin is unknown
+            rm_str = '\x1b[0m'
+            if rm_str in value:
+                value = value.replace(rm_str, '')
 
         if "%" in value:
             try:
@@ -653,7 +660,7 @@ class MainWindow(QMainWindow):
             return
 
         self.print_line_to_output("")
-        self.print_line_to_output(f'Staring tool {self.tool_name} ...')
+        self.print_line_to_output(f'Staring tool {self.tool_name} ... \n')
         self.print_line_to_output(bt.ascii_art)
         self.print_line_to_output("Tool arguments:")
         self.print_line_to_output(json.dumps(args, indent=4))
@@ -704,9 +711,21 @@ class MainWindow(QMainWindow):
         self.message(stderr)
 
     def handle_stdout(self):
-        data = self.p.readAllStandardOutput()
-        stdout = bytes(data).decode("utf8")
-        self.message(stdout)
+        # data = self.p.readAllStandardOutput()
+        line = self.p.readLine()
+        line = bytes(line).decode("utf8")
+
+        # process line output
+        sys.stdout.flush()
+        self.custom_callback(line)
+
+        # out_str = '{} tool finished'.format(bt.get_bera_tool_name(self.tool_api))
+        # sep_str = '-' * len(out_str)
+        # self.custom_callback(sep_str)
+        # self.custom_callback(out_str)
+        # self.custom_callback(sep_str)
+
+        # self.message(line)
 
     def handle_state(self, state):
         states = {
@@ -720,6 +739,8 @@ class MainWindow(QMainWindow):
     def process_finished(self):
         self.message("Process finished.")
         self.p = None
+        self.progress_bar.setValue(0)
+        self.progress_label.setText("")
 
 
 # start @ the beginning
