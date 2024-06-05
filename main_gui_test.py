@@ -231,20 +231,12 @@ class MainWindow(QMainWindow):
             self.tool_name = self.recent_tool
             self.tool_api = bt.get_bera_tool_api(self.tool_name)
 
-        max_cores = bt.get_max_cpu_cores()
-        if bt.get_max_procs() <= 0:
-            bt.set_max_procs(max_cores)
+        self.update_procs(bt.get_max_cpu_cores())
 
         # QProcess run tools
-        self.p = None
+        self.process = None
 
         # BERA tool list
-        if platform.system() == 'Windows':
-            self.ext = '.exe'
-        else:
-            self.ext = ''
-
-        exe_name = "BERA_tools{}".format(self.ext)
         self.bera_tools = bt.bera_tools
         self.tools_list = bt.tools_list
         self.sorted_tools = bt.sorted_tools
@@ -253,12 +245,6 @@ class MainWindow(QMainWindow):
         self.lower_toolboxes = bt.lower_toolboxes
 
         self.exe_path = path.dirname(path.abspath(__file__))
-        os.chdir(self.exe_path)
-        for filename in glob.iglob('**/*', recursive=True):
-            if filename.endswith(exe_name):
-                self.exe_path = path.dirname(path.abspath(filename))
-                break
-
         bt.set_bera_dir(self.exe_path)
 
         # Tree view
@@ -361,18 +347,6 @@ class MainWindow(QMainWindow):
         self.right_layout.insertWidget(0, self.tool_widget)
         self.right_layout.update()
 
-    def update_selected_bera_tool(self):
-        selected_item = -1
-        for toolbox in self.bera_tools['toolbox']:
-            for item in toolbox['tools']:
-                if item['name']:
-                    if item == self.tool_name:  # update selected_item it tool found
-                        selected_item = len(self.tools_list) - 1
-
-        if selected_item == -1:  # set self.tool_name as default tool
-            selected_item = 0
-            self.tool_name = self.tools_list[0]
-
     def save_tool_parameter(self):
         # Retrieve tool parameters from GUI
         args = self.tool_widget.get_widgets_arguments()
@@ -392,109 +366,22 @@ class MainWindow(QMainWindow):
     def get_current_tool_args(self):
         return bt.get_bera_tool_args(self.tool_name)
 
-    def update_search_tool_info(self, event):
-        """
-        read selection when tool selected from search results then call self.update_tool_help
-        """
-        selection = self.search_results_listbox.curselection()
-        self.tool_name = self.search_results_listbox.get(selection[0])
-
-        self.set_tool()
-        if self.search_tool_selected:
-            print("Index {} selected".format(self.search_tool_selected[0]))
-
-    def update_toolbox_icon(self, event):
-        cur_item = self.tool_tree.focus()
-        dict_tool = self.tool_tree.item(cur_item)  # retrieve the toolbox name
-        self.toolbox_name = dict_tool.get('text').replace("  ", "")  # delete the space between the icon and text
-        self.toolbox_open = dict_tool.get('open')  # retrieve whether the toolbox is open or not
-        if self.toolbox_open:  # set image accordingly
-            self.tool_tree.item(self.toolbox_name, image=self.open_toolbox_icon)
-        else:
-            self.tool_tree.item(self.toolbox_name, image=self.closed_toolbox_icon)
-
-    def update_search(self, event):
-        self.search_list = []
-        self.search_string = self.search_text.get().lower()
-        self.search_results_listbox.delete(0, 'end')  # empty the search results
-        num_results = 0
-        for tool in self.tools_list:  # search tool names
-            tool_lower = tool.lower()
-            # search string found within tool name
-            if tool_lower.find(self.search_string) != (-1):
-                num_results = num_results + 1
-                # tool added to listbox and to search results string
-                self.search_results_listbox.insert(num_results, tool)
-                self.search_list.append(tool)
-        index = 0
-
-        # update label to show tools found
-        self.search_frame.config(text="{} Tools Found".format(len(self.search_list)))
-
     def tool_help_button(self):
         # open the user manual section for the current tool
         webbrowser.open_new_tab(self.get_current_tool_parameters()['tech_link'])
 
-    def add_tools_to_treeview(self):
-        # Add toolboxes and tools to treeview
-        index = 0
-        for toolbox in self.lower_toolboxes:
-            if toolbox.find('/') != (-1):  # toolboxes
-                self.tool_tree.insert(toolbox[:toolbox.find('/')], 0, text="  " + toolbox[toolbox.find('/') + 1:],
-                                      iid=toolbox[toolbox.find('/') + 1:], tags='toolbox',
-                                      image=self.closed_toolbox_icon)
-                for tool in self.sorted_tools[index]:  # add tools within toolbox
-                    self.tool_tree.insert(toolbox[toolbox.find('/') + 1:], 'end', text="  " + tool,
-                                          tags='tool', iid=tool, image=self.tool_icon)
-            else:  # sub toolboxes
-                self.tool_tree.insert('', 'end', text="  " + toolbox, iid=toolbox, tags='toolbox',
-                                      image=self.closed_toolbox_icon)
-                for tool in self.sorted_tools[index]:  # add tools within sub toolbox
-                    self.tool_tree.insert(toolbox, 'end', text="  " + tool, iid=tool, tags='tool', image=self.tool_icon)
-            index = index + 1
-
-    def add_recent_tool_to_search(self):
-        if bt.recent_tool:
-            self.search_results_listbox.delete(0, 'end')
-            self.search_list.append(bt.recent_tool)
-            self.search_results_listbox.insert(END, bt.recent_tool)
-
-            self.search_frame.config(text='Recent used tool')
-            self.tool_name = self.search_results_listbox.get(0)
-
-    #########################################################
-    #               Functions (original)
     def about(self):
-        self.out_text.delete('1.0', tk.END)
+        self.text_edit.clear()
         self.print_to_output(bt.about())
 
     def license(self):
-        self.out_text.delete('1.0', tk.END)
+        self.text_edit.clear()
         self.print_to_output(bt.license())
 
-    def set_directory(self):
-        try:
-            self.working_dir = filedialog.askdirectory(initialdir=self.working_dir)
-            bt.set_working_dir(self.working_dir)
-        except:
-            messagebox.showinfo("Warning", "Could not set the working directory.")
-
-    def set_procs(self):
-        try:
-            max_cpu_cores = bt.get_max_cpu_cores()
-            max_procs = askinteger(
-                title="Max CPU cores used",
-                prompt="Set the number of processors to be used (maximum: {}, -1: all):".format(max_cpu_cores),
-                parent=self, initialvalue=bt.get_max_procs(), minvalue=-1, maxvalue=max_cpu_cores)
-            if max_procs:
-                self.update_procs(max_procs)
-                self.mpc_scale.set(max_procs)
-        except:
-            messagebox.showinfo("Warning", "Could not set the number of processors.")
-
+    @staticmethod
     def update_procs(self, value):
-        self.max_procs = int(value)
-        bt.set_max_procs(self.max_procs)
+        max_procs = int(value)
+        bt.set_max_procs(max_procs)
 
     def reset_tool(self):
         for widget in self.arg_scroll_frame.winfo_children():
@@ -506,44 +393,6 @@ class MainWindow(QMainWindow):
                         widget.value = default_value
                     else:
                         widget.value.set(default_value)
-
-    # def start_run_tool_thread(self):
-    #     t = threading.Thread(target=self.run_tool, args=())
-    #     t.daemon = True
-    #     t.start()
-
-    # def run_tool(self):
-    #     bt.set_working_dir(self.working_dir)
-    #
-    #     args = self.tool_widget.get_widgets_arguments()
-    #     if not args:
-    #         print('Please check the parameters.')
-    #         return
-    #
-    #     self.print_line_to_output("")
-    #     self.print_line_to_output(f'Staring tool {self.tool_name} ...')
-    #     self.print_line_to_output(bt.ascii_art)
-    #     self.print_line_to_output("Tool arguments:")
-    #     self.print_line_to_output(json.dumps(args, indent=4))
-    #     self.print_line_to_output("")
-    #
-    #     bt.recent_tool = self.tool_name
-    #     self.save_tool_parameter()
-    #
-    #     # Run the tool and check the return value for an error
-    #     for key in args.keys():
-    #         if type(args[key]) is not str:
-    #             args[key] = str(args[key])
-    #
-    #     # disable button
-    #     if bt.run_tool_bt(self.tool_api, args, self.custom_callback) == 1:
-    #         print("Error running {}".format(self.tool_name))
-    #     else:
-    #         self.progress_var = 0
-    #         self.progress_label.setText('Progress:')
-    #         self.progress_bar.update()
-    #
-    #     return
 
     def print_to_output(self, text):
         self.text_edit.moveCursor(QTextCursor.End)
@@ -583,31 +432,6 @@ class MainWindow(QMainWindow):
     def view_code(self):
         webbrowser.open_new_tab(self.get_current_tool_parameters()['tech_link'])
 
-    def update_args_box(self):
-        s = ""
-        self.current_tool_lbl['text'] = "Current Tool: {}".format(
-            self.tool_name)
-
-        # self.spacer['width'] = width=(35-len(self.tool_name))
-        # for item in bt.tool_help(self.tool_name).splitlines():
-        for item in bt.get_bera_tool_info(self.tool_name).splitlines():
-            if item.startswith("-"):
-                k = item.split(" ")
-                if "--" in k[1]:
-                    value = k[1].replace(",", "")
-                else:
-                    value = k[0].replace(",", "")
-
-                if "flag" in item.lower():
-                    s = s + value + " "
-                else:
-                    if "file" in item.lower():
-                        s = s + value + "='{}' "
-                    else:
-                        s = s + value + "={} "
-
-        # self.args_value.set(s.strip())
-
     def custom_callback(self, value):
         """
         A custom callback for dealing with tool output.
@@ -642,12 +466,6 @@ class MainWindow(QMainWindow):
 
         self.update()  # this is needed for cancelling and updating the progress bar
 
-    def select_all(self, event):
-        self.out_text.tag_add(tk.SEL, "1.0", tk.END)
-        self.out_text.mark_set(tk.INSERT, "1.0")
-        self.out_text.see(tk.INSERT)
-        return 'break'
-
     def message(self, s):
         self.text_edit.appendPlainText(s)
 
@@ -678,31 +496,31 @@ class MainWindow(QMainWindow):
         # self.run_button.config(text='Running', state='disabled')
         tool_type, tool_args = bt.run_tool_bt_qt(self.tool_api, args, self.custom_callback)
 
-        if self.p is None:  # No process running.
+        if self.process is None:  # No process running.
             self.message("Executing process")
-            self.p = QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
-            self.p.readyReadStandardOutput.connect(self.handle_stdout)
-            self.p.readyReadStandardError.connect(self.handle_stderr)
-            self.p.stateChanged.connect(self.handle_state)
-            self.p.finished.connect(self.process_finished)  # Clean up once complete.
-            self.p.start(tool_type, tool_args)
+            self.process = QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
+            self.process.readyReadStandardOutput.connect(self.handle_stdout)
+            self.process.readyReadStandardError.connect(self.handle_stderr)
+            self.process.stateChanged.connect(self.handle_state)
+            self.process.finished.connect(self.process_finished)  # Clean up once complete.
+            self.process.start(tool_type, tool_args)
 
-        while self.p is not None:
+        while self.process is not None:
             sys.stdout.flush()
             if bt.cancel_op:
                 bt.cancel_op = False
-                self.p.terminate()
+                self.process.terminate()
 
             else:
                 break
 
     def stop_process(self):
         bt.cancel_op = True
-        if self.p:
-            self.p.kill()
+        if self.process:
+            self.process.kill()
 
     def handle_stderr(self):
-        data = self.p.readAllStandardError()
+        data = self.process.readAllStandardError()
         stderr = bytes(data).decode("utf8")
         # Extract progress if it is in the data.
         progress = simple_percent_parser(stderr)
@@ -712,18 +530,12 @@ class MainWindow(QMainWindow):
 
     def handle_stdout(self):
         # data = self.p.readAllStandardOutput()
-        line = self.p.readLine()
+        line = self.process.readLine()
         line = bytes(line).decode("utf8")
 
         # process line output
         sys.stdout.flush()
         self.custom_callback(line)
-
-        # out_str = '{} tool finished'.format(bt.get_bera_tool_name(self.tool_api))
-        # sep_str = '-' * len(out_str)
-        # self.custom_callback(sep_str)
-        # self.custom_callback(out_str)
-        # self.custom_callback(sep_str)
 
         # self.message(line)
 
@@ -738,7 +550,7 @@ class MainWindow(QMainWindow):
 
     def process_finished(self):
         self.message("Process finished.")
-        self.p = None
+        self.process = None
         self.progress_bar.setValue(0)
         self.progress_label.setText("")
 

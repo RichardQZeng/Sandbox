@@ -58,7 +58,7 @@ class BTData(object):
         self.ascii_art = None
 
         # set maximum available cpu core for tools
-        self.__max_cpu_cores = min(BT_MAXIMUM_CPU_CORES, multiprocessing.cpu_count())
+        self.max_cpu_cores = min(BT_MAXIMUM_CPU_CORES, multiprocessing.cpu_count())
 
         # load bera tools
         self.tool_history = []
@@ -182,7 +182,7 @@ class BTData(object):
         return self.max_procs
 
     def get_max_cpu_cores(self):
-        return self.__max_cpu_cores
+        return self.max_cpu_cores
 
     # def save_recent_tool(self):
     #     gui_settings = self.load_saved_tool_info()
