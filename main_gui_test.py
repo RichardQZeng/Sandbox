@@ -270,9 +270,61 @@ class MainWindow(QMainWindow):
         tool_history_box.setTitle('Tool history')
         tool_history_box.setLayout(tool_history_layout)
 
+        # left layout
+        page_layout = QHBoxLayout()
+        self.left_layout = QVBoxLayout()
+        self.right_layout = QVBoxLayout()
+
+        self.left_layout.addWidget(tree_box)
+        self.left_layout.addWidget(tool_history_box)
+
+        # top buttons
+        label = QLabel(f'{self.tool_name}')
+        label.setFont(QFont('Consolas', 14))
+        self.btn_advanced = QPushButton('Show Advanced Options')
+        self.btn_advanced.setFixedWidth(180)
+        btn_help = QPushButton('help')
+        btn_code = QPushButton('Code')
+        btn_help.setFixedWidth(250)
+        btn_code.setFixedWidth(100)
+
+        self.btn_layout_top = QHBoxLayout()
+        self.btn_layout_top.setAlignment(Qt.AlignRight)
+        self.btn_layout_top.addWidget(label)
+        self.btn_layout_top.addStretch(1)
+        self.btn_layout_top.addWidget(self.btn_advanced)
+        self.btn_layout_top.addWidget(btn_code)
+
         # ToolWidgets
         tool_args = bt.get_bera_tool_args(self.tool_name)
-        self.tool_widget = ToolWidgets(self.recent_tool, tool_args)
+        self.tool_widget = ToolWidgets(self.recent_tool, tool_args, bt.show_advanced)
+
+        # bottom buttons
+        label = QLabel('Use CPU Cores: ')
+        slider = QSlider(Qt.Horizontal)
+        btn_clear_args = QPushButton('Clear Arguments')
+        btn_run = QPushButton('Run')
+        btn_cancel = QPushButton('Cancel')
+        btn_clear_args.setFixedWidth(150)
+        slider.setFixedWidth(200)
+        btn_run.setFixedWidth(120)
+        btn_cancel.setFixedWidth(120)
+
+        btn_layout_bottom = QHBoxLayout()
+        btn_layout_bottom.setAlignment(Qt.AlignRight)
+        btn_layout_bottom.addStretch(1)
+        btn_layout_bottom.addWidget(btn_clear_args)
+        btn_layout_bottom.addWidget(label)
+        btn_layout_bottom.addWidget(slider)
+        btn_layout_bottom.addWidget(btn_run)
+        btn_layout_bottom.addWidget(btn_cancel)
+
+        self.top_right_layout = QVBoxLayout()
+        self.top_right_layout.addLayout(self.btn_layout_top)
+        self.top_right_layout.addWidget(self.tool_widget)
+        self.top_right_layout.addLayout(btn_layout_bottom)
+        tool_widget_grp = QGroupBox('Tool')
+        tool_widget_grp.setLayout(self.top_right_layout)
 
         # Text widget
         self.text_edit = QPlainTextEdit()
@@ -284,47 +336,26 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar(self)
         self.progress_var = 0
 
-        # buttons
-        label = QLabel('Use CPU Cores: ')
-        slider = QSlider(Qt.Horizontal)
-        slider.setFixedWidth(300)
-        button_layout = QHBoxLayout()
-        button_run = QPushButton('Run')
-        button_cancel = QPushButton('Cancel')
-        button_run.setFixedWidth(150)
-        button_cancel.setFixedWidth(150)
-        button_layout.setAlignment(Qt.AlignRight)
-
-        button_layout.addStretch(1)
-        button_layout.addWidget(label)
-        button_layout.addWidget(slider)
-        button_layout.addWidget(button_run)
-        button_layout.addWidget(button_cancel)
-
         # progress layout
         progress_layout = QHBoxLayout()
         progress_layout.addWidget(self.progress_label)
         progress_layout.addWidget(self.progress_bar)
 
-        page_layout = QHBoxLayout()
-        self.left_layout = QVBoxLayout()
-        self.right_layout = QVBoxLayout()
-    
-        page_layout.addLayout(self.left_layout, 3)
-        page_layout.addLayout(self.right_layout, 7)
-
-        self.left_layout.addWidget(tree_box)
-        self.left_layout.addWidget(tool_history_box)
-
-        self.right_layout.addWidget(self.tool_widget)
-        self.right_layout.addLayout(button_layout)
+        self.right_layout.addWidget(tool_widget_grp)
         self.right_layout.addWidget(self.text_edit)
         self.right_layout.addLayout(progress_layout)
 
+        # main layouts
+        page_layout.addLayout(self.left_layout, 3)
+        page_layout.addLayout(self.right_layout, 7)
+
         # signals and slots
-        # self.button_run.clicked.connect(self.start_run_tool_thread)
-        button_run.clicked.connect(self.start_process)
-        button_cancel.clicked.connect(self.stop_process)
+        self.btn_advanced.clicked.connect(self.show_advanced)
+        btn_help.clicked.connect(self.show_help)
+        btn_code.clicked.connect(self.view_code)
+        btn_clear_args.clicked.connect(self.clear_args)
+        btn_run.clicked.connect(self.start_process)
+        btn_cancel.clicked.connect(self.stop_process)
 
         widget = QWidget(self)
         widget.setLayout(page_layout)
@@ -341,11 +372,15 @@ class MainWindow(QMainWindow):
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
         tool_args = bt.get_bera_tool_args(self.tool_name)
 
-        self.tool_widget = ToolWidgets(self.tool_name, tool_args)
-        widget = self.right_layout.itemAt(0).widget()
-        self.right_layout.removeWidget(widget)
-        self.right_layout.insertWidget(0, self.tool_widget)
-        self.right_layout.update()
+        # update tool label
+        self.btn_layout_top.itemAt(0).widget().setText(self.tool_name)
+
+        # update tool widget
+        self.tool_widget = ToolWidgets(self.tool_name, tool_args, bt.show_advanced)
+        widget = self.top_right_layout.itemAt(1).widget()
+        self.top_right_layout.removeWidget(widget)
+        self.top_right_layout.insertWidget(1, self.tool_widget)
+        self.top_right_layout.update()
 
     def save_tool_parameter(self):
         # Retrieve tool parameters from GUI
@@ -366,7 +401,7 @@ class MainWindow(QMainWindow):
     def get_current_tool_args(self):
         return bt.get_bera_tool_args(self.tool_name)
 
-    def tool_help_button(self):
+    def show_help(self):
         # open the user manual section for the current tool
         webbrowser.open_new_tab(self.get_current_tool_parameters()['tech_link'])
 
@@ -378,7 +413,6 @@ class MainWindow(QMainWindow):
         self.text_edit.clear()
         self.print_to_output(bt.license())
 
-    @staticmethod
     def update_procs(self, value):
         max_procs = int(value)
         bt.set_max_procs(max_procs)
@@ -411,23 +445,14 @@ class MainWindow(QMainWindow):
         self.progress_bar.update_idletasks()
 
     def show_advanced(self):
-        if not self.show_advanced_button or len(self.arg_scroll_frame.winfo_children()) <= 0:
-            return
-
         if bt.show_advanced:
             bt.show_advanced = False
+            self.btn_advanced.setText("Show Advanced Options")
         else:
             bt.show_advanced = True
+            self.btn_advanced.setText("Hide Advanced Options")
 
-        if bt.show_advanced:
-            self.show_advanced_button.config(text="Hide Advanced Options")
-            self.save_tool_parameter()
-            self.set_tool()
-        else:
-            self.show_advanced_button.config(text="Show Advanced Options")
-            for widget in self.arg_scroll_frame.winfo_children():
-                if widget.optional:
-                    widget.grid_forget()
+        self.set_tool()
 
     def view_code(self):
         webbrowser.open_new_tab(self.get_current_tool_parameters()['tech_link'])
@@ -469,6 +494,9 @@ class MainWindow(QMainWindow):
     def message(self, s):
         self.text_edit.appendPlainText(s)
 
+    def clear_args(self):
+        self.tool_widget.clear_args()
+
     def start_process(self):
         bt.set_working_dir(self.working_dir)
 
@@ -494,7 +522,7 @@ class MainWindow(QMainWindow):
 
         # disable button
         # self.run_button.config(text='Running', state='disabled')
-        tool_type, tool_args = bt.run_tool_bt_qt(self.tool_api, args, self.custom_callback)
+        tool_type, tool_args = bt.run_tool(self.tool_api, args, self.custom_callback)
 
         if self.process is None:  # No process running.
             self.message("Executing process")

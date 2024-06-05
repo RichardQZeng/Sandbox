@@ -21,10 +21,11 @@ from common import *
 class ToolWidgets(QWidget):
     signal_save_tool_params = pyqtSignal(object)
 
-    def __init__(self, tool_name, tool_args, parent=None):
+    def __init__(self, tool_name, tool_args, show_advanced, parent=None):
         super(ToolWidgets, self).__init__(parent)
 
         self.tool_name = tool_name
+        self.show_advanced = show_advanced
         self.current_tool_api = ''
         self.widget_list = []
         self.setWindowTitle("Tool widgets")
@@ -117,6 +118,9 @@ class ToolWidgets(QWidget):
                 if widget.optional and widget.label:
                     widget.label.setStyleSheet("QLabel { background-color : transparent; color : blue; }")
 
+                if not self.show_advanced and widget.optional:
+                    widget.hide()
+
             self.widget_list.append(widget)
 
     def update_widgets(self, values_dict):
@@ -132,6 +136,9 @@ class ToolWidgets(QWidget):
                 params[item.flag] = item.get_value()
 
         self.signal_save_tool_params.emit(params)
+
+    def clear_args(self):
+        pass
 
 
 class FileSelector(QWidget):
@@ -448,6 +455,8 @@ if __name__ == '__main__':
     bt = BTData()
 
     app = QApplication(sys.argv)
-    dlg = ToolWidgets('Raster Line Attributes', bt.get_bera_tool_args('Raster Line Attributes'))
+    dlg = ToolWidgets('Raster Line Attributes',
+                      bt.get_bera_tool_args('Raster Line Attributes'),
+                      bt.show_advanced)
     dlg.show()
     sys.exit(app.exec_())
