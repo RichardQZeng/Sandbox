@@ -330,6 +330,7 @@ class MainWindow(QMainWindow):
         self.text_edit = QPlainTextEdit()
         self.text_edit.setFont(QFont('Consolas', 9))
         self.text_edit.setReadOnly(True)
+        self.print_about()
 
         # progress bar
         self.progress_label = QLabel()
@@ -405,11 +406,11 @@ class MainWindow(QMainWindow):
         # open the user manual section for the current tool
         webbrowser.open_new_tab(self.get_current_tool_parameters()['tech_link'])
 
-    def about(self):
+    def print_about(self):
         self.text_edit.clear()
         self.print_to_output(bt.about())
 
-    def license(self):
+    def print_license(self):
         self.text_edit.clear()
         self.print_to_output(bt.license())
 
@@ -507,7 +508,7 @@ class MainWindow(QMainWindow):
 
         self.print_line_to_output("")
         self.print_line_to_output(f'Staring tool {self.tool_name} ... \n')
-        self.print_line_to_output(bt.ascii_art)
+        # self.print_line_to_output(bt.ascii_art)
         self.print_line_to_output("Tool arguments:")
         self.print_line_to_output(json.dumps(args, indent=4))
         self.print_line_to_output("")
