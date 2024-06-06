@@ -19,7 +19,6 @@ from bt_data import *
 
 # A regular expression, to extract the % complete.
 progress_re = re.compile("Total complete: (\d+)%")
-
 bt = BTData()
 
 
@@ -235,6 +234,7 @@ class MainWindow(QMainWindow):
 
         # QProcess run tools
         self.process = None
+        self.cancel_op = False
 
         # BERA tool list
         self.bera_tools = bt.bera_tools
@@ -399,9 +399,6 @@ class MainWindow(QMainWindow):
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
         return bt.get_bera_tool_params(self.tool_name)
 
-    def get_current_tool_args(self):
-        return bt.get_bera_tool_args(self.tool_name)
-
     def show_help(self):
         # open the user manual section for the current tool
         webbrowser.open_new_tab(self.get_current_tool_parameters()['tech_link'])
@@ -418,17 +415,6 @@ class MainWindow(QMainWindow):
         max_procs = int(value)
         bt.set_max_procs(max_procs)
 
-    def reset_tool(self):
-        for widget in self.arg_scroll_frame.winfo_children():
-            args = bt.get_bera_tool_params(self.tool_name)
-            for param in args['parameters']:
-                default_value = param['default_value']
-                if widget.flag == param['flag']:
-                    if type(widget) is OptionsInput:
-                        widget.value = default_value
-                    else:
-                        widget.value.set(default_value)
-
     def print_to_output(self, text):
         self.text_edit.moveCursor(QTextCursor.End)
         self.text_edit.insertPlainText(text)
@@ -438,12 +424,6 @@ class MainWindow(QMainWindow):
         self.text_edit.moveCursor(QTextCursor.End)
         self.text_edit.insertPlainText(text+'\n')
         self.text_edit.moveCursor(QTextCursor.End)
-
-    def cancel_operation(self):
-        bt.cancel_op = True
-        self.print_line_to_output('------------------------------------')
-        self.print_line_to_output("Tool operation cancelling...")
-        self.progress_bar.update_idletasks()
 
     def show_advanced(self):
         if bt.show_advanced:
@@ -487,10 +467,10 @@ class MainWindow(QMainWindow):
             str_label = str_label.replace("PROGRESS_LABEL", "").strip()
             self.progress_label.setText(str_label)
 
-        if value != '':
+        if value:
             self.print_line_to_output(value)
 
-        self.update()  # this is needed for cancelling and updating the progress bar
+        # self.update()  # this is needed for cancelling and updating the progress bar
 
     def message(self, s):
         self.text_edit.appendPlainText(s)
@@ -507,8 +487,8 @@ class MainWindow(QMainWindow):
             return
 
         self.print_line_to_output("")
-        self.print_line_to_output(f'Staring tool {self.tool_name} ... \n')
-        # self.print_line_to_output(bt.ascii_art)
+        self.print_line_to_output(f'Starting tool {self.tool_name} ... \n')
+        self.print_line_to_output('-----------------------------')
         self.print_line_to_output("Tool arguments:")
         self.print_line_to_output(json.dumps(args, indent=4))
         self.print_line_to_output("")
@@ -526,7 +506,8 @@ class MainWindow(QMainWindow):
         tool_type, tool_args = bt.run_tool(self.tool_api, args, self.custom_callback)
 
         if self.process is None:  # No process running.
-            self.message("Executing process")
+            self.print_line_to_output(f"Tool {self.tool_name} started")
+            self.print_line_to_output("-----------------------")
             self.process = QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
             self.process.readyReadStandardOutput.connect(self.handle_stdout)
             self.process.readyReadStandardError.connect(self.handle_stderr)
@@ -536,16 +517,17 @@ class MainWindow(QMainWindow):
 
         while self.process is not None:
             sys.stdout.flush()
-            if bt.cancel_op:
-                bt.cancel_op = False
+            if self.cancel_op:
+                self.cancel_op = False
                 self.process.terminate()
 
             else:
                 break
 
     def stop_process(self):
-        bt.cancel_op = True
+        self.cancel_op = True
         if self.process:
+            self.print_line_to_output(f"Tool {self.tool_name} terminating ...")
             self.process.kill()
 
     def handle_stderr(self):
@@ -575,7 +557,8 @@ class MainWindow(QMainWindow):
             QProcess.Running: 'Running',
         }
         state_name = states[state]
-        self.message(f"State changed: {state_name}")
+        if states[state] == 'Not running' and self.cancel_op:
+            self.message('Tool operation canceled')
 
     def process_finished(self):
         self.message("Process finished.")

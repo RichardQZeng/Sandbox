@@ -88,7 +88,6 @@ class BTData(object):
         self.load_gui_data()
         self.get_tool_history()
 
-        self.cancel_op = False
         self.default_callback = default_callback
         self.start_minimized = False
 
