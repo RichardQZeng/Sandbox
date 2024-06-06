@@ -9,7 +9,7 @@ from PyQt5.QtCore import (Qt, QItemSelectionModel, QModelIndex, pyqtSignal,
 from PyQt5.QtWidgets import (
     QApplication, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QWidget, QTreeView,
     QAbstractItemView, QListWidgetItem, QPlainTextEdit, QListView, QGroupBox,
-    QLineEdit, QSlider, QLabel, QProgressBar, QToolTip
+    QLineEdit, QSlider, QLabel, QProgressBar, QToolTip, QToolButton
 )
 
 from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont, QCursor
@@ -261,8 +261,23 @@ class BTListView(QWidget):
         if data_list:
             self.slm.setStringList(data_list)
 
-        self.list_view = QListView()
+        delete_icon = QStyle.SP_DialogCloseButton
+        delete_icon = self.style().standardIcon(delete_icon)
+        clear_icon = QStyle.SP_DialogResetButton
+        clear_icon = self.style().standardIcon(clear_icon)
+        btn_delete = QPushButton()
+        btn_clear = QPushButton()
+        btn_delete.setIcon(delete_icon)
+        btn_clear.setIcon(clear_icon)
+        btn_delete.setFixedWidth(40)
+        btn_clear.setFixedWidth(40)
 
+        layout_h = QHBoxLayout()
+        layout_h.addWidget(btn_delete)
+        layout_h.addWidget(btn_clear)
+        layout_h.addStretch(1)
+
+        self.list_view = QListView()
         self.list_view.setModel(self.slm)  # set model
         self.list_view.setFlow(QListView.TopToBottom)
         self.list_view.setBatchSize(5)
@@ -271,6 +286,7 @@ class BTListView(QWidget):
         self.list_view.setLayoutMode(QListView.SinglePass)
 
         layout = QVBoxLayout()
+        layout.addLayout(layout_h)
         layout.addWidget(self.list_view)
         self.setLayout(layout)
 
