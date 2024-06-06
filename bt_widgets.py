@@ -146,20 +146,20 @@ class FileSelector(QWidget):
         super(FileSelector, self).__init__(parent)
 
         # first make sure that the json data has the correct fields
-        j = json.loads(json_str)
-        self.name = j['name']
-        self.description = j['description']
-        self.flag = j['flag']
-        self.parameter_type = j['parameter_type']
+        params = json.loads(json_str)
+        self.name = params['name']
+        self.description = params['description']
+        self.flag = params['flag']
+        self.parameter_type = params['parameter_type']
         self.file_type = ""
         if "ExistingFile" in self.parameter_type:
-            self.file_type = j['parameter_type']['ExistingFile']
+            self.file_type = params['parameter_type']['ExistingFile']
         elif "NewFile" in self.parameter_type:
-            self.file_type = j['parameter_type']['NewFile']
-        self.optional = j['optional']
-        self.value = j['default_value']
-        if 'saved_value' in j.keys():
-            self.value = j['saved_value']
+            self.file_type = params['parameter_type']['NewFile']
+        self.optional = params['optional']
+        self.value = params['default_value']
+        if 'saved_value' in params.keys():
+            self.value = params['saved_value']
 
         self.layout = QHBoxLayout()
         self.label = QLabel(self.name)
@@ -293,16 +293,16 @@ class OptionsInput(QWidget):
         super(OptionsInput, self).__init__(parent)
 
         # first make sure that the json data has the correct fields
-        j = json.loads(json_str)
-        self.name = j['name']
-        self.description = j['description']
-        self.flag = j['flag']
-        self.parameter_type = j['parameter_type']
-        self.optional = j['optional']
-        self.data_type = j['data_type']
-        self.value = str(j['default_value'])
-        if 'saved_value' in j.keys():
-            self.value = j['saved_value']
+        params = json.loads(json_str)
+        self.name = params['name']
+        self.description = params['description']
+        self.flag = params['flag']
+        self.parameter_type = params['parameter_type']
+        self.optional = params['optional']
+        self.data_type = params['data_type']
+        self.value = str(params['default_value'])
+        if 'saved_value' in params.keys():
+            self.value = params['saved_value']
 
         self.label = QLabel(self.name)
         self.label.setMinimumWidth(BT_LABEL_MIN_WIDTH)
@@ -311,7 +311,7 @@ class OptionsInput(QWidget):
 
         i = 1
         default_index = -1
-        self.option_list = j['parameter_type']['OptionList']
+        self.option_list = params['parameter_type']['OptionList']
         if self.option_list:
             self.option_list = [str(item) for item in self.option_list]  # convert to strings
         values = ()
@@ -347,16 +347,16 @@ class DataInput(QWidget):
         super(DataInput, self).__init__(parent)
 
         # first make sure that the json data has the correct fields
-        j = json.loads(json_str)
-        self.name = j['name']
-        self.description = j['description']
-        self.flag = j['flag']
-        self.parameter_type = j['parameter_type']
-        self.optional = j['optional']
+        params = json.loads(json_str)
+        self.name = params['name']
+        self.description = params['description']
+        self.flag = params['flag']
+        self.parameter_type = params['parameter_type']
+        self.optional = params['optional']
 
-        self.value = j['default_value']
-        if 'saved_value' in j.keys():
-            self.value = j['saved_value']
+        self.value = params['default_value']
+        if 'saved_value' in params.keys():
+            self.value = params['saved_value']
 
         self.label = QLabel(self.name)
         self.label.setMinimumWidth(BT_LABEL_MIN_WIDTH)
@@ -408,7 +408,7 @@ class DataInput(QWidget):
 
 class DoubleSlider(QSlider):
 
-    # create our our signal that we can connect to if necessary
+    # create our signal that we can connect to if necessary
     doubleValueChanged = pyqtSignal(float)
 
     def __init__(self, decimals=3, *args, **kargs):
