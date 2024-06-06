@@ -239,7 +239,7 @@ class FileSelector(QWidget):
                         if selected_filters[0] != '.*':
                             file_path = file_path.with_suffix(selected_filters[0])
 
-                result = str(file_path)
+                result = file_path.as_posix()
                 self.set_value(result)
         except:
             t = "file"
@@ -266,8 +266,8 @@ class FileSelector(QWidget):
 
     def set_value(self, value):
         self.value = value
-        self.in_file.setText(Path(self.value).name)
-        self.in_file.setToolTip(value)
+        self.in_file.setText(self.value)
+        self.in_file.setToolTip(self.value)
 
 
 class FileOrFloat(QWidget):
