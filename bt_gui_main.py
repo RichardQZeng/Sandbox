@@ -251,7 +251,7 @@ class BTSlider(QWidget):
         return f'Use CPU Cores: {value:3d}'
 
 
-class BTListView(QListView):
+class BTListView(QWidget):
     tool_changed = pyqtSignal(str)
 
     def __init__(self, data_list=None, parent=None):
@@ -261,12 +261,18 @@ class BTListView(QListView):
         if data_list:
             self.slm.setStringList(data_list)
 
-        self.setModel(self.slm)  # set model
-        self.setFlow(QListView.TopToBottom)
-        self.setBatchSize(5)
+        self.list_view = QListView()
 
-        self.clicked.connect(self.clicked_list)
-        self.setLayoutMode(QListView.SinglePass)
+        self.list_view.setModel(self.slm)  # set model
+        self.list_view.setFlow(QListView.TopToBottom)
+        self.list_view.setBatchSize(5)
+
+        self.list_view.clicked.connect(self.clicked_list)
+        self.list_view.setLayoutMode(QListView.SinglePass)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.list_view)
+        self.setLayout(layout)
 
     def clicked_list(self, model_index):
         self.tool_changed.emit(self.slm.data(model_index, Qt.DisplayRole))
