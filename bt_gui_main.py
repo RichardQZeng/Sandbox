@@ -9,10 +9,10 @@ from PyQt5.QtCore import (Qt, QItemSelectionModel, QModelIndex, pyqtSignal,
 from PyQt5.QtWidgets import (
     QApplication, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QWidget, QTreeView,
     QAbstractItemView, QListWidgetItem, QPlainTextEdit, QListView, QGroupBox,
-    QLineEdit, QSlider, QLabel, QProgressBar
+    QLineEdit, QSlider, QLabel, QProgressBar, QToolTip
 )
 
-from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont
+from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont, QCursor
 
 from tool_widgets import *
 from bt_data import *
@@ -191,6 +191,66 @@ class BTTreeView(QWidget):
         self.select_tool_by_index(index)
 
 
+class ClickSlider(QSlider):
+    def mousePressEvent(self, event):
+        super(ClickSlider, self).mousePressEvent(event)
+        if event.button() == Qt.LeftButton:
+            val = self.pixel_pos_to_range_value(event.pos())
+            self.setValue(val)
+            self.sliderMoved.emit(val)
+
+    def pixel_pos_to_range_value(self, pos):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        gr = self.style().subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderGroove, self)
+        sr = self.style().subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self)
+
+        if self.orientation() == Qt.Horizontal:
+            slider_length = sr.width()
+            slider_min = gr.x()
+            slider_max = gr.right() - slider_length + 1
+        else:
+            slider_length = sr.height()
+            slider_min = gr.y()
+            slider_max = gr.bottom() - slider_length + 1;
+        pr = pos - sr.center() + sr.topLeft()
+        p = pr.x() if self.orientation() == Qt.Horizontal else pr.y()
+        return QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), p - slider_min,
+                                              slider_max - slider_min, opt.upsideDown)
+
+
+class BTSlider(QWidget):
+    def __init__(self, current, maximum, parent=None):
+        super(BTSlider, self).__init__(parent)
+
+        self.value = current
+        self.slider = ClickSlider(Qt.Horizontal)
+        self.slider.setFixedWidth(120)
+        self.slider.setTickInterval(2)
+        self.slider.setTickPosition(QSlider.TicksAbove)
+        self.slider.setRange(1, maximum)
+        self.slider.setValue(current)
+        self.label = QLabel(self.generate_label_text(current))
+
+        layout = QHBoxLayout()
+        layout.addWidget(self.label)
+        layout.addWidget(self.slider)
+        self.setLayout(layout)
+
+        self.slider.sliderMoved.connect(self.slider_moved)
+
+    def slider_moved(self, value):
+        bt.set_max_procs(value)
+        QToolTip.showText(QCursor.pos(), f'{value}')
+        self.label.setText(self.generate_label_text())
+
+    def generate_label_text(self, value=None):
+        if not value:
+            value = self.slider.value()
+
+        return f'Use CPU Cores: {value:3d}'
+
+
 class BTListView(QListView):
     tool_changed = pyqtSignal(str)
 
@@ -300,13 +360,12 @@ class MainWindow(QMainWindow):
         self.tool_widget = ToolWidgets(self.recent_tool, tool_args, bt.show_advanced)
 
         # bottom buttons
-        label = QLabel('Use CPU Cores: ')
-        slider = QSlider(Qt.Horizontal)
+        slider = BTSlider(bt.max_procs, bt.max_cpu_cores)
         btn_clear_args = QPushButton('Clear Arguments')
         btn_run = QPushButton('Run')
         btn_cancel = QPushButton('Cancel')
         btn_clear_args.setFixedWidth(150)
-        slider.setFixedWidth(200)
+        slider.setFixedWidth(250)
         btn_run.setFixedWidth(120)
         btn_cancel.setFixedWidth(120)
 
@@ -314,7 +373,6 @@ class MainWindow(QMainWindow):
         btn_layout_bottom.setAlignment(Qt.AlignRight)
         btn_layout_bottom.addStretch(1)
         btn_layout_bottom.addWidget(btn_clear_args)
-        btn_layout_bottom.addWidget(label)
         btn_layout_bottom.addWidget(slider)
         btn_layout_bottom.addWidget(btn_run)
         btn_layout_bottom.addWidget(btn_cancel)
