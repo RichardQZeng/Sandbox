@@ -361,10 +361,10 @@ class MainWindow(QMainWindow):
 
         # bottom buttons
         slider = BTSlider(bt.max_procs, bt.max_cpu_cores)
-        btn_clear_args = QPushButton('Clear Arguments')
+        btn_default_args = QPushButton('Load Default Arguments')
         btn_run = QPushButton('Run')
         btn_cancel = QPushButton('Cancel')
-        btn_clear_args.setFixedWidth(150)
+        btn_default_args.setFixedWidth(150)
         slider.setFixedWidth(250)
         btn_run.setFixedWidth(120)
         btn_cancel.setFixedWidth(120)
@@ -372,7 +372,7 @@ class MainWindow(QMainWindow):
         btn_layout_bottom = QHBoxLayout()
         btn_layout_bottom.setAlignment(Qt.AlignRight)
         btn_layout_bottom.addStretch(1)
-        btn_layout_bottom.addWidget(btn_clear_args)
+        btn_layout_bottom.addWidget(btn_default_args)
         btn_layout_bottom.addWidget(slider)
         btn_layout_bottom.addWidget(btn_run)
         btn_layout_bottom.addWidget(btn_cancel)
@@ -412,7 +412,7 @@ class MainWindow(QMainWindow):
         self.btn_advanced.clicked.connect(self.show_advanced)
         btn_help.clicked.connect(self.show_help)
         btn_code.clicked.connect(self.view_code)
-        btn_clear_args.clicked.connect(self.clear_args)
+        btn_default_args.clicked.connect(self.load_default_args)
         btn_run.clicked.connect(self.start_process)
         btn_cancel.clicked.connect(self.stop_process)
 
@@ -533,8 +533,8 @@ class MainWindow(QMainWindow):
     def message(self, s):
         self.text_edit.appendPlainText(s)
 
-    def clear_args(self):
-        self.tool_widget.clear_args()
+    def load_default_args(self):
+        self.tool_widget.load_default_args()
 
     def start_process(self):
         bt.set_working_dir(self.working_dir)

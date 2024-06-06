@@ -137,8 +137,9 @@ class ToolWidgets(QWidget):
 
         self.signal_save_tool_params.emit(params)
 
-    def clear_args(self):
-        pass
+    def load_default_args(self):
+        for item in self.widget_list:
+            item.set_default_value()
 
 
 class FileSelector(QWidget):
@@ -157,7 +158,9 @@ class FileSelector(QWidget):
         elif "NewFile" in self.parameter_type:
             self.file_type = params['parameter_type']['NewFile']
         self.optional = params['optional']
-        self.value = params['default_value']
+
+        self.default_value = params['default_value']
+        self.value = self.default_value
         if 'saved_value' in params.keys():
             self.value = params['saved_value']
 
@@ -269,6 +272,10 @@ class FileSelector(QWidget):
         self.in_file.setText(self.value)
         self.in_file.setToolTip(self.value)
 
+    def set_default_value(self):
+        self.value = self.default_value
+        self.in_file.setText(self.value)
+
 
 class FileOrFloat(QWidget):
     def __init__(self, json_str, parent=None):
@@ -300,7 +307,9 @@ class OptionsInput(QWidget):
         self.parameter_type = params['parameter_type']
         self.optional = params['optional']
         self.data_type = params['data_type']
-        self.value = str(params['default_value'])
+
+        self.default_value = str(params['default_value'])
+        self.value = self.default_value
         if 'saved_value' in params.keys():
             self.value = params['saved_value']
 
@@ -338,6 +347,12 @@ class OptionsInput(QWidget):
             if value == v:
                 self.combobox.setCurrentIndex(self.option_list.index(v))
 
+    def set_default_value(self):
+        self.value = self.default_value
+        for v in self.option_list:
+            if self.value == v:
+                self.combobox.setCurrentIndex(self.option_list.index(v))
+
     def get_value(self):
         return self.flag, self.value
 
@@ -354,7 +369,8 @@ class DataInput(QWidget):
         self.parameter_type = params['parameter_type']
         self.optional = params['optional']
 
-        self.value = params['default_value']
+        self.default_value = params['default_value']
+        self.value = self.default_value
         if 'saved_value' in params.keys():
             self.value = params['saved_value']
 
@@ -403,6 +419,11 @@ class DataInput(QWidget):
     def set_value(self, value):
         if self.data_input:
             self.data_input.setValue(value)
+            self.update_value()
+
+    def set_default_value(self):
+        if self.data_input:
+            self.data_input.setValue(self.default_value)
             self.update_value()
 
 
