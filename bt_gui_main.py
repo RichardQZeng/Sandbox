@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont
 
-from bt_widgets import *
+from tool_widgets import *
 from bt_data import *
 
 # A regular expression, to extract the % complete.
@@ -568,12 +568,13 @@ class MainWindow(QMainWindow):
 
 
 # start @ the beginning
-faulthandler.enable()
+def runner():
+    faulthandler.enable()
 
-app = QApplication(sys.argv)
+    app = QApplication(sys.argv)
 
-window = MainWindow()
-window.setMinimumSize(1024, 768)
-window.show()
+    window = MainWindow()
+    window.setMinimumSize(1024, 768)
+    window.show()
 
-app.exec()
+    app.exec()
