@@ -27,16 +27,24 @@ from rasterio import features, mask
 import fiona
 import shapely
 from shapely.affinity import rotate
-from shapely.ops import unary_union, split, transform, substring, linemerge, nearest_points
+from shapely.ops import (
+    unary_union,
+    split,
+    transform,
+    substring,
+    linemerge,
+    nearest_points
+)
 from shapely.geometry import (
-                              shape,
-                              mapping,
-                              Point,
-                              LineString,
-                              MultiLineString,
-                              MultiPoint,
-                              Polygon,
-                              MultiPolygon)
+    shape,
+    mapping,
+    Point,
+    LineString,
+    MultiLineString,
+    MultiPoint,
+    Polygon,
+    MultiPolygon
+)
 
 import pandas as pd
 import geopandas as gpd
@@ -134,6 +142,7 @@ if not BT_DEBUGGING:
 
     # suppress warnings
     import warnings
+
     warnings.filterwarnings("ignore")
 
     # to suppress Pandas UserWarning: Geometry column does not contain geometry when splitting lines
@@ -161,7 +170,7 @@ def clip_raster(in_raster_file, clip_geom, buffer=0.0, out_raster_file=None, ras
         clip_geo_buffer = [clip_geom.buffer(buffer)]
         out_image: np.ndarray
         out_image, out_transform = mask.mask(raster_file, clip_geo_buffer,
-                                                      crop=True, nodata=ras_nodata, filled=True)
+                                             crop=True, nodata=ras_nodata, filled=True)
 
     height, width = out_image.shape[1:]
     out_meta.update({"driver": "GTiff",
@@ -197,7 +206,7 @@ def save_raster_to_file(in_raster_mem, in_meta, out_raster_file):
 
 def clip_lines(clip_geom, buffer, in_line_file, out_line_file):
     in_line = gpd.read_file(in_line_file)
-    out_line = in_line.clip(clip_geom.buffer(buffer*BT_BUFFER_RATIO))
+    out_line = in_line.clip(clip_geom.buffer(buffer * BT_BUFFER_RATIO))
 
     if out_line_file and len(out_line) > 0:
         out_line.to_file(out_line_file)
@@ -425,11 +434,11 @@ def compare_crs(crs_org, crs_dst):
             crs_org_norm = CRS(crs_org.ExportToWkt())
             crs_dst_norm = CRS(crs_dst.ExportToWkt())
             if crs_org_norm.is_compound:
-                crs_org_proj=crs_org_norm.sub_crs_list[0].coordinate_operation.name
+                crs_org_proj = crs_org_norm.sub_crs_list[0].coordinate_operation.name
             elif crs_org_norm.name == 'unnamed':
                 return False
             else:
-                crs_org_proj=crs_org_norm.coordinate_operation.name
+                crs_org_proj = crs_org_norm.coordinate_operation.name
 
             if crs_dst_norm.is_compound:
                 crs_dst_proj = crs_dst_norm.sub_crs_list[0].coordinate_operation.name
@@ -473,7 +482,7 @@ def identity_polygon(line_args):
         for i in in_fp_polygon.index:
             if not in_fp_polygon.loc[i].geometry.intersects(line_geom):
                 drop_list.append(i)
-            elif line_geom.intersection(in_fp_polygon.loc[i].geometry).length/line_geom.length < 0.30:
+            elif line_geom.intersection(in_fp_polygon.loc[i].geometry).length / line_geom.length < 0.30:
                 drop_list.append(i)  # if less the 1/5 of line is inside of polygon, ignore
 
         # drop all polygons not used
@@ -490,8 +499,7 @@ def identity_polygon(line_args):
     return line, identity
 
 
-def line_split2(in_ln_shp,seg_length):
-
+def line_split2(in_ln_shp, seg_length):
     # Check the OLnFID column in data. If it is not, column will be created
     if 'OLnFID' not in in_ln_shp.columns.array:
         if BT_DEBUGGING:
@@ -509,9 +517,9 @@ def split_into_Equal_Nth_segments(df, seg_length):
     crs = odf.crs
     if 'OLnSEG' not in odf.columns.array:
         df['OLnSEG'] = np.nan
-    df = odf.assign(geometry=odf.apply(lambda x: cut_line(x.geometry,seg_length), axis=1))
+    df = odf.assign(geometry=odf.apply(lambda x: cut_line(x.geometry, seg_length), axis=1))
     # df = odf.assign(geometry=odf.apply(lambda x: cut_line(x.geometry, x.geometry.length), axis=1))
-    df=df.explode()
+    df = df.explode()
 
     df['OLnSEG'] = df.groupby('OLnFID').cumcount()
     gdf = gpd.GeoDataFrame(df, geometry=df.geometry, crs=crs)
@@ -521,13 +529,13 @@ def split_into_Equal_Nth_segments(df, seg_length):
     if "shape_leng" in gdf.columns.array:
         gdf["shape_leng"] = gdf.geometry.length
     elif "LENGTH" in gdf.columns.array:
-        gdf["LENGTH"]=gdf.geometry.length
+        gdf["LENGTH"] = gdf.geometry.length
     else:
         gdf["shape_leng"] = gdf.geometry.length
     return gdf
 
 
-def split_line_nPart(line,seg_length):
+def split_line_nPart(line, seg_length):
     seg_line = shapely.segmentize(line, seg_length)
     distances = np.arange(seg_length, line.length, seg_length)
 
@@ -581,7 +589,7 @@ def cut(line, distance, lines):
             pd = line.project(Point(p))
 
             if abs(pd - distance) < BT_EPSILON:
-                lines.append(LineString(coords[:i+1]))
+                lines.append(LineString(coords[:i + 1]))
                 line = LineString(coords[i:])
                 end_pt = None
                 break
@@ -677,10 +685,10 @@ def find_centerline(poly, input_line):
     return centerline, CenterlineStatus.SUCCESS
 
 
-def find_route(array, start, end, fully_connected,geometric):
+def find_route(array, start, end, fully_connected, geometric):
     from skimage.graph import route_through_array
-    route_list,cost_list = route_through_array(array, start, end,fully_connected,geometric)
-    return route_list,cost_list
+    route_list, cost_list = route_through_array(array, start, end, fully_connected, geometric)
+    return route_list, cost_list
 
 
 def find_corridor_polygon(corridor_thresh, in_transform, line_gpd):
@@ -882,8 +890,8 @@ def regenerate_centerline(poly, input_line):
     -------
 
     """
-    line_1 = substring(input_line, start_dist=0.0, end_dist=input_line.length/2)
-    line_2 = substring(input_line, start_dist=input_line.length/2, end_dist=input_line.length)
+    line_1 = substring(input_line, start_dist=0.0, end_dist=input_line.length / 2)
+    line_2 = substring(input_line, start_dist=input_line.length / 2, end_dist=input_line.length)
 
     pts = shapely.force_2d([Point(list(input_line.coords)[0]),
                             Point(list(line_1.coords)[-1]),
@@ -1167,4 +1175,3 @@ def execute_multiprocessing(in_func, app_name, in_data, processes, workers, verb
         return None
 
     return out_result
-
