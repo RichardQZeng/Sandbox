@@ -257,10 +257,6 @@ class BTListView(QWidget):
     def __init__(self, data_list=None, parent=None):
         super(BTListView, self).__init__(parent)
 
-        self.slm = QStringListModel()  # model
-        if data_list:
-            self.slm.setStringList(data_list)
-
         delete_icon = QStyle.SP_DialogCloseButton
         delete_icon = self.style().standardIcon(delete_icon)
         clear_icon = QStyle.SP_DialogResetButton
@@ -269,6 +265,8 @@ class BTListView(QWidget):
         btn_clear = QPushButton()
         btn_delete.setIcon(delete_icon)
         btn_clear.setIcon(clear_icon)
+        btn_delete.setToolTip('Delete selected tool history')
+        btn_clear.setToolTip('clear all tool history')
         btn_delete.setFixedWidth(40)
         btn_clear.setFixedWidth(40)
 
@@ -278,23 +276,48 @@ class BTListView(QWidget):
         layout_h.addStretch(1)
 
         self.list_view = QListView()
-        self.list_view.setModel(self.slm)  # set model
         self.list_view.setFlow(QListView.TopToBottom)
         self.list_view.setBatchSize(5)
 
-        self.list_view.clicked.connect(self.clicked_list)
+        self.list_model = QStringListModel()  # model
+        if data_list:
+            self.list_model.setStringList(data_list)
+
+        self.list_view.setModel(self.list_model)  # set model
+        self.sel_model = self.list_view.selectionModel()
+
         self.list_view.setLayoutMode(QListView.SinglePass)
+        btn_delete.clicked.connect(self.delete_selected_item)
+        btn_clear.clicked.connect(self.clear_all_items)
+        # self.list_view.clicked.connect(self.clicked_list)
+        self.sel_model.selectionChanged.connect(self.selection_changed)
 
         layout = QVBoxLayout()
         layout.addLayout(layout_h)
         layout.addWidget(self.list_view)
         self.setLayout(layout)
 
-    def clicked_list(self, model_index):
-        self.tool_changed.emit(self.slm.data(model_index, Qt.DisplayRole))
+    # def clicked_list(self, model_index):
+    #     self.tool_changed.emit(self.list_model.data(model_index, Qt.DisplayRole))
+
+    def selection_changed(self, new, old):
+        indexes = new.indexes()
+        if len(indexes) == 0:
+            return
+
+        selection = new.indexes()[0]
+        tool = self.list_model.itemData(selection)[0]
+        self.tool_changed.emit(tool)
 
     def set_data_list(self, data_list):
-        self.slm.setStringList(data_list)
+        self.list_model.setStringList(data_list)
+
+    def delete_selected_item(self):
+        selection = self.sel_model.currentIndex()
+        self.list_model.removeRow(selection.row())
+
+    def clear_all_items(self):
+        self.list_model.setStringList([])
 
 
 class MainWindow(QMainWindow):
