@@ -659,8 +659,6 @@ class MainWindow(QMainWindow):
         sys.stdout.flush()
         self.custom_callback(line)
 
-        # self.message(line)
-
     def handle_state(self, state):
         states = {
             QProcess.NotRunning: 'Not running',
@@ -685,11 +683,8 @@ class MainWindow(QMainWindow):
 # start @ the beginning
 def runner():
     # faulthandler.enable()
-
     app = QApplication(sys.argv)
-
     window = MainWindow()
     window.setMinimumSize(1024, 768)
     window.show()
-
     app.exec()
