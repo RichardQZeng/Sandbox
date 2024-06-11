@@ -6,16 +6,15 @@ from PyQt5.QtWidgets import (QApplication, QLineEdit, QFileDialog, QComboBox, QW
                              QHBoxLayout, QVBoxLayout, QSpinBox, QDoubleSpinBox)
 
 from PyQt5.QtCore import pyqtSignal, Qt, QPoint
-from pathlib import Path
-import json
-import re
+from re import search
 
 import inspect
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0, parentdir)
-
 from common import *
+
+
+current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
 
 
 class ToolWidgets(QWidget):
@@ -247,7 +246,7 @@ class FileSelector(QWidget):
         Extract filters out of full filter string, split int list and replace first '*'
         Result: ['.shp', '.*']
         """
-        filter_list = re.search('\((.+?)\)', filter_str).group(1).split(' ')
+        filter_list = search('\((.+?)\)', filter_str).group(1).split(' ')
         filter_list = [item.replace('*', '', 1) for item in filter_list if item != '']
         return filter_list
 
