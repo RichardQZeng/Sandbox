@@ -299,16 +299,12 @@ class BTListView(QWidget):
         self.list_view.setLayoutMode(QListView.SinglePass)
         btn_delete.clicked.connect(self.delete_selected_item)
         btn_clear.clicked.connect(self.clear_all_items)
-        # self.list_view.clicked.connect(self.clicked_list)
         self.sel_model.selectionChanged.connect(self.selection_changed)
 
         layout = QVBoxLayout()
         layout.addLayout(layout_h)
         layout.addWidget(self.list_view)
         self.setLayout(layout)
-
-    # def clicked_list(self, model_index):
-    #     self.tool_changed.emit(self.list_model.data(model_index, Qt.DisplayRole))
 
     def selection_changed(self, new, old):
         indexes = new.indexes()
@@ -479,10 +475,8 @@ class MainWindow(QMainWindow):
         if tool:
             self.tool_name = tool
 
-        # tree view select tool
-        # TODO use signal
+        # let tree view select the tool
         self.tree_view.select_tool_by_name(self.tool_name)
-
         self.tool_api = bt.get_bera_tool_api(self.tool_name)
         tool_args = bt.get_bera_tool_args(self.tool_name)
 
@@ -504,7 +498,6 @@ class MainWindow(QMainWindow):
         bt.save_tool_info()
 
         # update tool history list
-        # TODO use signal
         bt.get_tool_history()
         self.tool_history.set_data_list(bt.tool_history)
 
@@ -583,8 +576,6 @@ class MainWindow(QMainWindow):
         if value:
             self.print_line_to_output(value)
 
-        # self.update()  # this is needed for cancelling and updating the progress bar
-
     def message(self, s):
         self.text_edit.appendPlainText(s)
 
@@ -631,7 +622,6 @@ class MainWindow(QMainWindow):
             if self.cancel_op:
                 self.cancel_op = False
                 self.process.terminate()
-
             else:
                 break
 

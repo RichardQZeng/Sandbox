@@ -40,10 +40,6 @@ class ToolWidgets(QWidget):
         self.save_button.clicked.connect(self.save_tool_parameters)
         self.save_button.setFixedSize(200, 50)
         layout.addSpacing(20)
-
-        # TODO remove save parameters
-        # layout.addWidget(self.save_button, alignment=Qt.AlignCenter)
-        # layout.addStretch()
         self.setLayout(layout)
 
     def get_widgets_arguments(self):
@@ -233,7 +229,9 @@ class FileSelector(QWidget):
 
                 result = file_path.as_posix()
                 self.set_value(result)
-        except:
+        except Exception as e:
+            print(e)
+
             t = "file"
             if self.parameter_type == "Directory":
                 t = "directory"
