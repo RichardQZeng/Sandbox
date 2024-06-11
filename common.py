@@ -28,7 +28,15 @@ import fiona
 import shapely
 from shapely.affinity import rotate
 from shapely.ops import unary_union, split, transform, substring, linemerge, nearest_points
-from shapely.geometry import shape, mapping, Point, LineString, MultiLineString, MultiPoint, Polygon, MultiPolygon
+from shapely.geometry import (
+                              shape,
+                              mapping,
+                              Point,
+                              LineString,
+                              MultiLineString,
+                              MultiPoint,
+                              Polygon,
+                              MultiPolygon)
 
 import pandas as pd
 import geopandas as gpd
@@ -91,7 +99,7 @@ BT_MAXIMUM_CPU_CORES = 60  # multiprocessing has limit of 64, consider pathos
 BT_BUFFER_RATIO = 0.0  # overlapping ratio of raster when clipping lines
 BT_LABEL_MIN_WIDTH = 130
 BT_SHOW_ADVANCED_OPTIONS = False
-BT_EPSLON = sys.float_info.epsilon  # np.finfo(float).eps
+BT_EPSILON = sys.float_info.epsilon  # np.finfo(float).eps
 BT_UID = 'BT_UID'
 
 GROUPING_SEGMENT = True
@@ -572,7 +580,7 @@ def cut(line, distance, lines):
         for i, p in enumerate(coords):
             pd = line.project(Point(p))
 
-            if abs(pd - distance) < BT_EPSLON:
+            if abs(pd - distance) < BT_EPSILON:
                 lines.append(LineString(coords[:i+1]))
                 line = LineString(coords[i:])
                 end_pt = None
@@ -795,8 +803,8 @@ def centerline_is_valid(centerline, input_line):
 
     # centerline length less the half of least cost path
     if (centerline.length < input_line.length / 2 or
-            centerline.distance(Point(input_line.coords[0])) > BT_EPSLON or
-            centerline.distance(Point(input_line.coords[-1])) > BT_EPSLON):
+            centerline.distance(Point(input_line.coords[0])) > BT_EPSILON or
+            centerline.distance(Point(input_line.coords[-1])) > BT_EPSILON):
         return False
 
     return True

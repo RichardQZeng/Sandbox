@@ -1,16 +1,26 @@
-import glob
-import platform
 import webbrowser
 import faulthandler
-import re
+from re import compile
 
-from PyQt5.QtCore import (Qt, QItemSelectionModel, QModelIndex, pyqtSignal,
-                          QProcess, QSortFilterProxyModel, QRegExp, QStringListModel)
+from PyQt5.QtCore import (Qt, QItemSelectionModel, pyqtSignal, QProcess,
+                          QSortFilterProxyModel, QRegExp, QStringListModel)
 from PyQt5.QtWidgets import (
-    QApplication, QHBoxLayout, QVBoxLayout, QMainWindow, QPushButton, QWidget, QTreeView,
-    QAbstractItemView, QListWidgetItem, QPlainTextEdit, QListView, QGroupBox,
-    QLineEdit, QSlider, QLabel, QProgressBar, QToolTip, QToolButton
-)
+                             QApplication,
+                             QHBoxLayout,
+                             QVBoxLayout,
+                             QMainWindow,
+                             QPushButton,
+                             QWidget,
+                             QTreeView,
+                             QAbstractItemView,
+                             QPlainTextEdit,
+                             QListView,
+                             QGroupBox,
+                             QLineEdit,
+                             QSlider,
+                             QLabel,
+                             QProgressBar,
+                             QToolTip)
 
 from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont, QCursor
 
@@ -18,7 +28,7 @@ from tool_widgets import *
 from bt_data import *
 
 # A regular expression, to extract the % complete.
-progress_re = re.compile("Total complete: (\d+)%")
+progress_re = compile("Total complete: (\d+)%")
 bt = BTData()
 
 
@@ -407,11 +417,11 @@ class MainWindow(QMainWindow):
         # bottom buttons
         slider = BTSlider(bt.max_procs, bt.max_cpu_cores)
         btn_default_args = QPushButton('Load Default Arguments')
-        btn_run = QPushButton('Run')
+        self.btn_run = QPushButton('Run')
         btn_cancel = QPushButton('Cancel')
         btn_default_args.setFixedWidth(150)
         slider.setFixedWidth(250)
-        btn_run.setFixedWidth(120)
+        self.btn_run.setFixedWidth(120)
         btn_cancel.setFixedWidth(120)
 
         btn_layout_bottom = QHBoxLayout()
@@ -419,7 +429,7 @@ class MainWindow(QMainWindow):
         btn_layout_bottom.addStretch(1)
         btn_layout_bottom.addWidget(btn_default_args)
         btn_layout_bottom.addWidget(slider)
-        btn_layout_bottom.addWidget(btn_run)
+        btn_layout_bottom.addWidget(self.btn_run)
         btn_layout_bottom.addWidget(btn_cancel)
 
         self.top_right_layout = QVBoxLayout()
@@ -458,7 +468,7 @@ class MainWindow(QMainWindow):
         btn_help.clicked.connect(self.show_help)
         btn_code.clicked.connect(self.view_code)
         btn_default_args.clicked.connect(self.load_default_args)
-        btn_run.clicked.connect(self.start_process)
+        self.btn_run.clicked.connect(self.start_process)
         btn_cancel.clicked.connect(self.stop_process)
 
         widget = QWidget(self)
@@ -604,14 +614,12 @@ class MainWindow(QMainWindow):
             if type(args[key]) is not str:
                 args[key] = str(args[key])
 
-        # disable button
-        # self.run_button.config(text='Running', state='disabled')
         tool_type, tool_args = bt.run_tool(self.tool_api, args, self.custom_callback)
 
         if self.process is None:  # No process running.
             self.print_line_to_output(f"Tool {self.tool_name} started")
             self.print_line_to_output("-----------------------")
-            self.process = QProcess()  # Keep a reference to the QProcess (e.g. on self) while it's running.
+            self.process = QProcess()  # Keep a reference to the QProcess
             self.process.readyReadStandardOutput.connect(self.handle_stdout)
             self.process.readyReadStandardError.connect(self.handle_stderr)
             self.process.stateChanged.connect(self.handle_state)
@@ -636,6 +644,7 @@ class MainWindow(QMainWindow):
     def handle_stderr(self):
         data = self.process.readAllStandardError()
         stderr = bytes(data).decode("utf8")
+        
         # Extract progress if it is in the data.
         progress = simple_percent_parser(stderr)
         if progress:
@@ -643,7 +652,6 @@ class MainWindow(QMainWindow):
         self.message(stderr)
 
     def handle_stdout(self):
-        # data = self.p.readAllStandardOutput()
         line = self.process.readLine()
         line = bytes(line).decode("utf8")
 
@@ -660,8 +668,12 @@ class MainWindow(QMainWindow):
             QProcess.Running: 'Running',
         }
         state_name = states[state]
-        if states[state] == 'Not running' and self.cancel_op:
-            self.message('Tool operation canceled')
+        if state_name == 'Not running':
+            self.btn_run.setEnabled(True)
+            if self.cancel_op:
+                self.message('Tool operation canceled')
+        elif state_name == 'Starting':
+            self.btn_run.setEnabled(False)
 
     def process_finished(self):
         self.message("Process finished.")
@@ -672,7 +684,7 @@ class MainWindow(QMainWindow):
 
 # start @ the beginning
 def runner():
-    faulthandler.enable()
+    # faulthandler.enable()
 
     app = QApplication(sys.argv)
 

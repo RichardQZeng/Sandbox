@@ -3,29 +3,22 @@
 """
 
 # This script is part of the BERA Tools geospatial library.
-# Original Authors: Dr. John Lindsay
-# Created: 28/11/2017
-# Modified: 23/03/2023
+# Created: 23/03/2023
 # Author: Richard Zeng
 # License: MIT
 
-# from __future__ import print_function
 import os
 from os import path
-import sys
-from pathlib import Path
+
 import platform
 import json
 from json.decoder import JSONDecodeError
 import multiprocessing
-from subprocess import CalledProcessError, Popen, PIPE, STDOUT
+from subprocess import CalledProcessError
 
 from common import *
 
-
 running_windows = platform.system() == 'Windows'
-if running_windows:
-    from subprocess import STARTUPINFO, STARTF_USESHOWWINDOW
 
 
 def default_callback(value):
@@ -76,14 +69,7 @@ class BTData(object):
 
         self.setting_file = Path(self.exe_path).joinpath(r'.data\saved_tool_parameters.json')
         self.gui_setting_file = Path(self.exe_path).joinpath(r'.data\gui.json')
-        # if self.setting_file.exists():
-        #     self.setting_file = self.setting_file.as_posix()
-        #     # read the saved_tool_parameters.json file if it exists
-        #     with open(self.setting_file, 'r') as settings_file:
-        #         try:
-        #             settings = json.load(settings_file)
-        #         except JSONDecodeError:
-        #             settings = {}
+
         self.load_saved_tool_info()
         self.load_gui_data()
         self.get_tool_history()
@@ -134,12 +120,6 @@ class BTData(object):
                 json.dump(self.settings, write_settings_file, indent=4)
 
     def set_working_dir(self, path_str):
-        """ 
-        Sets the working directory, i.e. the directory in which
-        the data files are located. By setting the working 
-        directory, tool input parameters that are files need only
-        specify the file name rather than the complete file path.
-        """
         self.work_dir = path.normpath(path_str)
         self.save_setting('working_directory', self.work_dir)
 
@@ -157,15 +137,6 @@ class BTData(object):
         return self.verbose
 
     def set_verbose_mode(self, val=True):
-        """ 
-        Sets verbose mode. If verbose mode is False, tools will not
-        print output messages. Tools will frequently provide substantial
-        feedback while they are operating, e.g. updating progress for 
-        various sub-routines. When the user has scripted a workflow
-        that ties many tools in sequence, this level of tool output
-        can be problematic. By setting verbose mode to False, these
-        messages are suppressed and tools run as background processes.
-        """
         self.verbose = val
         self.save_setting('verbose_mode', val)
 
@@ -174,7 +145,6 @@ class BTData(object):
         Sets the flag used by BERA Tools to determine whether to use compression for output rasters.
         """
         self.max_procs = val
-
         self.save_setting('max_procs', val)
 
     def get_max_procs(self):
@@ -196,8 +166,7 @@ class BTData(object):
 
             work_dir = os.getcwd()
             os.chdir(self.exe_path)
-
-        except (OSError, ValueError, CalledProcessError) as err:
+        except Exception as err:
             callback(str(err))
             return 1
         finally:
@@ -215,16 +184,18 @@ class BTData(object):
             tool_name = self.get_bera_tool_name(tool_api)
             tool_type = self.get_bera_tool_type(tool_name)
             tool_args = None
+
             if tool_type == 'python':
                 tool_args = [os.path.join(r'..\tools', tool_api + '.py'),
-                             '-i', args_string, '-p', str(self.get_max_procs()), '-v', str(self.verbose)]
+                             '-i', args_string, '-p', str(self.get_max_procs()),
+                             '-v', str(self.verbose)]
             elif tool_type == 'executable':
                 print(globals().get(tool_api))
                 tool_args = globals()[tool_api](args_string)
                 work_dir = os.getcwd()
                 lapis_path = Path(work_dir).parent.joinpath('./third_party/Lapis_0_8')
                 os.chdir(lapis_path.as_posix())
-        except (OSError, ValueError, CalledProcessError) as err:
+        except Exception as err:
             callback(str(err))
             return 1
 
@@ -386,12 +357,6 @@ class BTData(object):
             toolboxes.append(tb)
         return toolboxes
 
-    def get_bera_tool_info(self, tool_name):
-        for toolbox in self.bera_tools['toolbox']:
-            for tool in toolbox['tools']:
-                if tool['name'] == tool_name:
-                    return tool['info']
-
     def get_bera_tool_params(self, tool_name):
         new_params = {'parameters': []}
         tool = {}
@@ -482,14 +447,6 @@ class BTData(object):
         tool_args = params['parameters']
 
         return tool_args
-
-    def get_bera_tool_parameters_list(self, tool_name):
-        params = self.get_bera_tool_params(tool_name)
-        param_list = {}
-        for item in params['parameters']:
-            param_list[item['flag']] = item['default_value']
-
-        return param_list
 
     def get_bera_tool_name(self, tool_api):
         tool_name = None

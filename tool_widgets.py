@@ -62,11 +62,6 @@ class ToolWidgets(QWidget):
 
         return args
 
-    def get_current_tool_parameters(self):
-        tool_params = bt.get_bera_tool_params(self.tool_name)
-        self.current_tool_api = tool_params['tool_api']
-        return tool_params
-
     def create_widgets(self, tool_args):
         param_num = 0
         for p in tool_args:
@@ -122,12 +117,6 @@ class ToolWidgets(QWidget):
                     widget.hide()
 
             self.widget_list.append(widget)
-
-    def update_widgets(self, values_dict):
-        for key, value in values_dict.items():
-            for item in self.widget_list:
-                if key == item.flag:
-                    item.set_value(value)
 
     def save_tool_parameters(self):
         params = {}
