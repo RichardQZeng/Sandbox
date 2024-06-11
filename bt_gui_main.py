@@ -2,8 +2,15 @@ import webbrowser
 import faulthandler
 from re import compile
 
-from PyQt5.QtCore import (Qt, QItemSelectionModel, pyqtSignal, QProcess,
-                          QSortFilterProxyModel, QRegExp, QStringListModel)
+from PyQt5.QtCore import (
+    Qt,
+    QItemSelectionModel,
+    pyqtSignal,
+    QProcess,
+    QSortFilterProxyModel,
+    QRegExp,
+    QStringListModel
+)
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -20,9 +27,16 @@ from PyQt5.QtWidgets import (
     QSlider,
     QLabel,
     QProgressBar,
-    QToolTip)
+    QToolTip
+)
 
-from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont, QCursor
+from PyQt5.QtGui import (
+    QStandardItem,
+    QStandardItemModel,
+    QIcon,
+    QTextCursor,
+    QFont,
+    QCursor)
 
 from tool_widgets import *
 from bt_data import *

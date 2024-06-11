@@ -1,9 +1,24 @@
 import os
 import sys
-from PyQt5.QtWidgets import (QApplication, QLineEdit, QFileDialog, QComboBox, QWidget,
-                             QPushButton, QLabel, QSlider, QMessageBox,
-                             QStyleOptionSlider, QStyle, QToolTip, QAbstractSlider,
-                             QHBoxLayout, QVBoxLayout, QSpinBox, QDoubleSpinBox)
+from PyQt5.QtWidgets import (
+    QApplication,
+    QLineEdit,
+    QFileDialog,
+    QComboBox,
+    QWidget,
+    QPushButton,
+    QLabel,
+    QSlider,
+    QMessageBox,
+    QStyleOptionSlider,
+    QStyle,
+    QToolTip,
+    QAbstractSlider,
+    QHBoxLayout,
+    QVBoxLayout,
+    QSpinBox,
+    QDoubleSpinBox
+)
 
 from PyQt5.QtCore import pyqtSignal, Qt, QPoint
 from re import search
