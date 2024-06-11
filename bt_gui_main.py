@@ -5,22 +5,22 @@ from re import compile
 from PyQt5.QtCore import (Qt, QItemSelectionModel, pyqtSignal, QProcess,
                           QSortFilterProxyModel, QRegExp, QStringListModel)
 from PyQt5.QtWidgets import (
-                             QApplication,
-                             QHBoxLayout,
-                             QVBoxLayout,
-                             QMainWindow,
-                             QPushButton,
-                             QWidget,
-                             QTreeView,
-                             QAbstractItemView,
-                             QPlainTextEdit,
-                             QListView,
-                             QGroupBox,
-                             QLineEdit,
-                             QSlider,
-                             QLabel,
-                             QProgressBar,
-                             QToolTip)
+    QApplication,
+    QHBoxLayout,
+    QVBoxLayout,
+    QMainWindow,
+    QPushButton,
+    QWidget,
+    QTreeView,
+    QAbstractItemView,
+    QPlainTextEdit,
+    QListView,
+    QGroupBox,
+    QLineEdit,
+    QSlider,
+    QLabel,
+    QProgressBar,
+    QToolTip)
 
 from PyQt5.QtGui import QStandardItem, QStandardItemModel, QIcon, QTextCursor, QFont, QCursor
 
@@ -528,7 +528,7 @@ class MainWindow(QMainWindow):
 
     def print_line_to_output(self, text, tag=None):
         self.text_edit.moveCursor(QTextCursor.End)
-        self.text_edit.insertPlainText(text+'\n')
+        self.text_edit.insertPlainText(text + '\n')
         self.text_edit.moveCursor(QTextCursor.End)
 
     def show_advanced(self):
@@ -634,7 +634,7 @@ class MainWindow(QMainWindow):
     def handle_stderr(self):
         data = self.process.readAllStandardError()
         stderr = bytes(data).decode("utf8")
-        
+
         # Extract progress if it is in the data.
         progress = simple_percent_parser(stderr)
         if progress:
