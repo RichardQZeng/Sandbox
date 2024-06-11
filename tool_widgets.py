@@ -11,7 +11,6 @@ from re import search
 import inspect
 from common import *
 
-
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
@@ -414,7 +413,6 @@ class DataInput(QWidget):
 
 
 class DoubleSlider(QSlider):
-
     # create our signal that we can connect to if necessary
     doubleValueChanged = pyqtSignal(float)
 
@@ -428,7 +426,7 @@ class DoubleSlider(QSlider):
         self.valueChanged.connect(self.emit_double_value_changed)
 
     def emit_double_value_changed(self):
-        value = float(super(DoubleSlider, self).value())/self._multi
+        value = float(super(DoubleSlider, self).value()) / self._multi
         self.doubleValueChanged.emit(value)
 
     def value(self):
@@ -459,6 +457,7 @@ class DoubleSlider(QSlider):
 
 if __name__ == '__main__':
     from bt_data import BTData
+
     bt = BTData()
 
     app = QApplication(sys.argv)
