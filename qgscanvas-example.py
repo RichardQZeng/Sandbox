@@ -168,6 +168,17 @@ class MapCanvas(QMainWindow):
         symbol.setColor(QColor("red"))
 
 
+class QgsMapWindow(QDialog):
+    def __init__(self, layers):
+        super().__init__()
+
+        canvas = MapCanvas(layers)
+        layout = QVBoxLayout()
+        layout.addWidget(canvas)
+
+        self.setLayout(layout)
+
+
 app = QApplication(sys.argv)
 # qgs = QgsApplication([], True)
 # QgsApplication.setPrefixPath("C:\OSGEO4~1\apps\qgis", True)
@@ -180,7 +191,10 @@ vlayer = QgsVectorLayer(
     "ogr",
 )
 
-window = MapCanvas([vlayer, rlayer])
+# window = MapCanvas([vlayer, rlayer])
+# window.show()
+
+window = QgsMapWindow([vlayer, rlayer])
 window.show()
 
 app.exec()
