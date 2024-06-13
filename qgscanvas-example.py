@@ -18,7 +18,8 @@ from PyQt5.QtWidgets import (
     QToolTip,
     QAction,
     QMainWindow,
-    QDockWidget
+    QDockWidget,
+    QDialog
 )
 
 from qgis.PyQt.QtCore import Qt, QVariant
@@ -46,7 +47,7 @@ from qgis.core import (
 )
 
 
-class MapWindow(QMainWindow):
+class MapCanvas(QMainWindow):
     def __init__(self, layers):
         QMainWindow.__init__(self)
 
@@ -179,7 +180,7 @@ vlayer = QgsVectorLayer(
     "ogr",
 )
 
-window = MapWindow([vlayer, rlayer])
+window = MapCanvas([vlayer, rlayer])
 window.show()
 
 app.exec()
