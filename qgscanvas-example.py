@@ -1,3 +1,4 @@
+import sys
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -14,8 +15,14 @@ from PyQt5.QtWidgets import (
     QSlider,
     QLabel,
     QProgressBar,
-    QToolTip
+    QToolTip,
+    QAction,
+    QMainWindow,
+    QDockWidget
 )
+
+from qgis.PyQt.QtCore import Qt, QVariant
+from qgis.PyQt.QtGui import QColor
 
 from qgis.gui import (
     QgsLayerTreeView,
@@ -25,35 +32,22 @@ from qgis.gui import (
     QgsLayerTreeMapCanvasBridge
 )
 
-from qgis.PyQt.QtWidgets import(
-    QAction,
-    QMainWindow,
-    QDockWidget
-)
-
-from qgis.PyQt.QtCore import Qt
 from qgis.core import (
+    edit,
     QgsRasterLayer,
     QgsVectorLayer,
     QgsApplication,
     QgsProject,
     QgsLayerTreeModel,
-
-)
-
-import sys
-from PyQt5.QtWidgets import QApplication
-
-rlayer = QgsRasterLayer(r"I:\BERATools\Surmont_New_AOI\Merged_CHM_2022.tif", "CHM")
-vlayer = QgsVectorLayer(
-    r"I:\BERATools\Surmont_New_AOI\seed_points_2022_v3.shp",
-    "seed points",
-    "ogr",
+    QgsField,
+    QgsFeature,
+    QgsGeometry,
+    QgsPointXY
 )
 
 
-class MyWnd(QMainWindow):
-    def __init__(self, layer):
+class MapWindow(QMainWindow):
+    def __init__(self, layers):
         QMainWindow.__init__(self)
 
         self.setWindowTitle("Map Window")
@@ -61,8 +55,8 @@ class MyWnd(QMainWindow):
         self.canvas = QgsMapCanvas()
         self.canvas.setCanvasColor(Qt.white)
 
-        self.canvas.setExtent(layer.extent())
-        self.canvas.setLayers([layer, rlayer])
+        self.canvas.setExtent(layers[0].extent())
+        self.canvas.setLayers(layers)
 
         self.setCentralWidget(self.canvas)
 
@@ -118,6 +112,8 @@ class MyWnd(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         dock.update()
 
+        self.project.addMapLayer(self.create_new_layer())
+
         self.pan()
 
     def zoom_in(self):
@@ -129,13 +125,61 @@ class MyWnd(QMainWindow):
     def pan(self):
         self.canvas.setMapTool(self.toolPan)
 
+    def create_new_layer(self):
+        vl = QgsVectorLayer("Point", "temp", "memory")
+
+        pr = vl.dataProvider()
+        pr.addAttributes([QgsField("name", QVariant.String),
+                          QgsField("age", QVariant.Int),
+                          QgsField("size", QVariant.Double)])
+        vl.updateFields()
+
+        f = QgsFeature()
+        f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(10, 10)))
+        f.setAttributes(["Ada L.", 2, 0.3])
+        pr.addFeature(f)
+        vl.updateExtents()
+        QgsProject.instance().addMapLayer(vl)
+
+        print("No. fields:", len(pr.fields()))
+        print("No. features:", pr.featureCount())
+        e = vl.extent()
+        print("Extent:", e.xMinimum(), e.yMinimum(), e.xMaximum(), e.yMaximum())
+
+        for f in vl.getFeatures():
+            print("Feature:", f.id(), f.attributes(), f.geometry().asPoint())
+
+        my_field_name = 'new field'
+        my_field_value = 'Hello world!'
+
+        with edit(vl):
+            vl.addAttribute(QgsField(my_field_name, QVariant.String))
+            vl.updateFields()
+            for f in vl.getFeatures():
+                f[my_field_name] = my_field_value
+                vl.updateFeature(f)
+
+        return vl
+
+    def set_layer_style(self, layer, style=None):
+        symbol = layer.renderer().symbol()
+        symbol.setWidth(2)
+        symbol.setColor(QColor("red"))
+
 
 app = QApplication(sys.argv)
 # qgs = QgsApplication([], True)
 # QgsApplication.setPrefixPath("C:\OSGEO4~1\apps\qgis", True)
 # QgsApplication.initQgis()
 
-window = MyWnd(vlayer)
+rlayer = QgsRasterLayer(r"I:\BERATools\Surmont_New_AOI\Merged_CHM_2022.tif", "CHM")
+vlayer = QgsVectorLayer(
+    r"I:\BERATools\Surmont_New_AOI\seed_points_2022_v3.shp",
+    "seed points",
+    "ogr",
+)
+
+window = MapWindow([vlayer, rlayer])
 window.show()
 
 app.exec()
