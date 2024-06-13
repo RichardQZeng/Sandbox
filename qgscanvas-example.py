@@ -174,6 +174,7 @@ class QgsMapWindow(QDialog):
 
         canvas = MapCanvas(layers)
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(canvas)
 
         self.setLayout(layout)
