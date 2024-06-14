@@ -113,7 +113,7 @@ class MapCanvas(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         dock.update()
 
-        self.project.addMapLayer(self.create_new_layer())
+        self.project.addMapLayer(self.create_new_layer('Point', 'Point layer'))
 
         self.pan()
 
@@ -126,9 +126,23 @@ class MapCanvas(QMainWindow):
     def pan(self):
         self.canvas.setMapTool(self.toolPan)
 
-    def create_new_layer(self):
-        vl = QgsVectorLayer("Point", "temp", "memory")
+    def get_layer_feature(self, layer):
+        for f in vl.getFeatures():
+            print("Feature:", f.id(), f.attributes(), f.geometry().asPoint())
 
+    def add_attribute_to_layer(self, layer, field, value):
+        field_name = field
+        field_value = value
+
+        with edit(layer):
+            layer.addAttribute(QgsField(field_name, QVariant.String))
+            layer.updateFields()
+            for f in layer.getFeatures():
+                f[field_name] = field_value
+                layer.updateFeature(f)
+
+    def create_new_layer(self, feature_type, layer_name):
+        vl = QgsVectorLayer(feature_type, layer_name, "memory")
         pr = vl.dataProvider()
         pr.addAttributes([QgsField("name", QVariant.String),
                           QgsField("age", QVariant.Int),
@@ -141,24 +155,6 @@ class MapCanvas(QMainWindow):
         pr.addFeature(f)
         vl.updateExtents()
         QgsProject.instance().addMapLayer(vl)
-
-        print("No. fields:", len(pr.fields()))
-        print("No. features:", pr.featureCount())
-        e = vl.extent()
-        print("Extent:", e.xMinimum(), e.yMinimum(), e.xMaximum(), e.yMaximum())
-
-        for f in vl.getFeatures():
-            print("Feature:", f.id(), f.attributes(), f.geometry().asPoint())
-
-        my_field_name = 'new field'
-        my_field_value = 'Hello world!'
-
-        with edit(vl):
-            vl.addAttribute(QgsField(my_field_name, QVariant.String))
-            vl.updateFields()
-            for f in vl.getFeatures():
-                f[my_field_name] = my_field_value
-                vl.updateFeature(f)
 
         return vl
 
